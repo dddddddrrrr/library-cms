@@ -33,13 +33,16 @@ model Account {
     type                     String
     provider                 String
     providerAccountId        String
-    refresh_token            String? // @db.Text
-    access_token             String? // @db.Text
+    refresh_token            String? @db.Text
+    access_token             String? @db.Text
     expires_at               Int?
     token_type               String?
     scope                    String?
-    id_token                 String? // @db.Text
+    id_token                 String? @db.Text
     session_state            String?
+    // 微信特有字段
+    openid                   String?
+    unionid                  String?
     user                     User    @relation(fields: [userId], references: [id], onDelete: Cascade)
     refresh_token_expires_in Int?
 
@@ -60,9 +63,25 @@ model User {
     email         String?   @unique
     emailVerified DateTime?
     image         String?
-    accounts      Account[]
-    sessions      Session[]
-    posts         Post[]
+    phone         String?   @unique
+    role          UserRole  @default(USER)
+    balance       Decimal   @default(0) @db.Decimal(10, 2) // 用户余额
+    createdAt     DateTime  @default(now())
+    updatedAt     DateTime  @updatedAt
+
+    accounts     Account[]
+    sessions     Session[]
+    posts        Post[]
+    orders       Order[]
+    reviews      Review[]
+    favorites    Favorite[]
+    recharges    Recharge[] // 充值记录
+    transactions Transaction[] // 交易流水
+}
+
+enum UserRole {
+    ADMIN
+    USER
 }
 
 model VerificationToken {
@@ -71,4 +90,199 @@ model VerificationToken {
     expires    DateTime
 
     @@unique([identifier, token])
+}
+
+// 图书分类表
+model Category {
+    id          String   @id @default(cuid())
+    name        String   @unique
+    description String?
+    createdAt   DateTime @default(now())
+    updatedAt   DateTime @updatedAt
+
+    // 关联
+    books    Book[]
+    parentId String?
+    parent   Category?  @relation("CategoryHierarchy", fields: [parentId], references: [id])
+    children Category[] @relation("CategoryHierarchy")
+
+    @@index([name])
+}
+
+// 图书表
+model Book {
+    id          String     @id @default(cuid())
+    title       String
+    author      String
+    isbn        String     @unique
+    description String?    @db.Text
+    cover       String? // 封面图片URL
+    price       Decimal    @db.Decimal(10, 2)
+    stock       Int        @default(0)
+    status      BookStatus @default(AVAILABLE)
+    publishDate DateTime?
+    publisher   String?
+    createdAt   DateTime   @default(now())
+    updatedAt   DateTime   @updatedAt
+
+    // 关联
+    categoryId String
+    category   Category    @relation(fields: [categoryId], references: [id])
+    orderItems OrderItem[]
+    reviews    Review[]
+    favorites  Favorite[]
+
+    @@index([title])
+    @@index([isbn])
+}
+
+enum BookStatus {
+    AVAILABLE
+    OUT_OF_STOCK
+    DISCONTINUED
+}
+
+// 订单表
+model Order {
+    id          String      @id @default(cuid())
+    userId      String
+    user        User        @relation(fields: [userId], references: [id])
+    status      OrderStatus @default(PENDING)
+    totalAmount Decimal     @db.Decimal(10, 2)
+    createdAt   DateTime    @default(now())
+    updatedAt   DateTime    @updatedAt
+
+    // 关联
+    orderItems OrderItem[]
+
+    @@index([userId])
+}
+
+// 订单项表
+model OrderItem {
+    id        String   @id @default(cuid())
+    orderId   String
+    bookId    String
+    quantity  Int
+    price     Decimal  @db.Decimal(10, 2)
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    // 关联
+    order Order @relation(fields: [orderId], references: [id])
+    book  Book  @relation(fields: [bookId], references: [id])
+
+    @@unique([orderId, bookId])
+}
+
+enum OrderStatus {
+    PENDING
+    PAID
+    SHIPPED
+    DELIVERED
+    CANCELLED
+}
+
+// 图书评价表
+model Review {
+    id        String   @id @default(cuid())
+    userId    String
+    bookId    String
+    rating    Int      @db.SmallInt // 1-5 星评价
+    content   String?  @db.Text
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    // 关联
+    user User @relation(fields: [userId], references: [id])
+    book Book @relation(fields: [bookId], references: [id])
+
+    @@unique([userId, bookId])
+    @@index([bookId])
+}
+
+// 收藏表
+model Favorite {
+    id        String   @id @default(cuid())
+    userId    String
+    bookId    String
+    createdAt DateTime @default(now())
+
+    // 关联
+    user User @relation(fields: [userId], references: [id])
+    book Book @relation(fields: [bookId], references: [id])
+
+    @@unique([userId, bookId])
+    @@index([userId])
+}
+
+// 充值记录表
+model Recharge {
+    id        String         @id @default(cuid())
+    userId    String
+    amount    Decimal        @db.Decimal(10, 2)
+    status    RechargeStatus @default(PENDING)
+    channel   PaymentChannel // 支付渠道
+    tradeNo   String? // 第三方支付交易号
+    createdAt DateTime       @default(now())
+    updatedAt DateTime       @updatedAt
+
+    // 关联
+    user User @relation(fields: [userId], references: [id])
+
+    @@index([userId])
+    @@index([tradeNo])
+}
+
+// 充值状态枚举
+enum RechargeStatus {
+    PENDING // 待支付
+    SUCCESS // 支付成功
+    FAILED // 支付失败
+    CANCELLED // 已取消
+}
+
+// 支付渠道枚举
+enum PaymentChannel {
+    WECHAT // 微信支付
+    ALIPAY // 支付宝
+    BANK_CARD // 银行卡
+}
+
+// 用户交易流水表
+model Transaction {
+    id          String            @id @default(cuid())
+    userId      String
+    amount      Decimal           @db.Decimal(10, 2)
+    balance     Decimal           @db.Decimal(10, 2) // 交易后余额
+    type        TransactionType // 交易类型
+    status      TransactionStatus @default(PENDING)
+    description String? // 交易描述
+    orderId     String? // 关联订单ID（如果是订单支付）
+    rechargeId  String? // 关联充值记录ID（如果是充值）
+    createdAt   DateTime          @default(now())
+    updatedAt   DateTime          @updatedAt
+
+    // 关联
+    user User @relation(fields: [userId], references: [id])
+
+    @@index([userId])
+    @@index([orderId])
+    @@index([createdAt])
+}
+
+// 交易类型枚举
+enum TransactionType {
+    RECHARGE // 充值
+    PAYMENT // 消费支付
+    REFUND // 退款
+    ADJUSTMENT // 余额调整
+}
+
+// 交易状态枚举
+enum TransactionStatus {
+    PENDING // 处理中
+    SUCCESS // 成功
+    FAILED // 失败
+    CANCELLED // 已取消
 }
