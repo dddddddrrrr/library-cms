@@ -24,7 +24,9 @@
     "@auth/prisma-adapter": "^2.7.2",
     "@hookform/resolvers": "^3.10.0",
     "@prisma/client": "^5.14.0",
+    "@radix-ui/react-avatar": "^1.1.2",
     "@radix-ui/react-dialog": "^1.1.4",
+    "@radix-ui/react-dropdown-menu": "^2.1.4",
     "@radix-ui/react-label": "^2.1.1",
     "@radix-ui/react-select": "^2.1.4",
     "@radix-ui/react-separator": "^1.1.1",
@@ -51,6 +53,7 @@
     "sonner": "^1.7.2",
     "superjson": "^2.2.1",
     "tailwind-merge": "^2.6.0",
+    "types": "link:next-themes/dist/types",
     "zod": "^3.24.1"
   },
   "devDependencies": {

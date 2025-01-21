@@ -17,3 +17,8 @@ export const formatTime = (timeInfo: { time: number; label: string }) => {
       throw new Error(`Unknown time unit: ${timeInfo.label}`);
   }
 };
+
+export const getUserInitials = (name: string) => {
+  const [firstName, lastName] = name.split(" ");
+  return lastName ? `${firstName![0]}${lastName[0]}` : firstName!.slice(0, 2);
+};
