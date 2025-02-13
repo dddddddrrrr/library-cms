@@ -1,7 +1,7 @@
-
+import HomeContent from "~/components/HomeContent";
 
 const Home = async () => {
-  return <div>Hello World</div>;
+  return <HomeContent />;
 };
 
 export default Home;

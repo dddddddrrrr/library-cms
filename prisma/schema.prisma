@@ -101,7 +101,7 @@ model Book {
     id          String     @id @default(cuid())
     title       String
     author      String
-    isbn        String     @unique
+    isbn        String     @unique // 国际标准书号
     description String?    @db.Text
     cover       String? // 封面图片URL
     price       Decimal    @db.Decimal(10, 2)
@@ -273,3 +273,4 @@ enum TransactionStatus {
     FAILED // 失败
     CANCELLED // 已取消
 }
+

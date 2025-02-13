@@ -73,3 +73,15 @@
     @apply bg-background text-foreground;
   }
 }
+
+.slick-dots li button:before {
+  display: none;
+}
+
+.slick-dots li.slick-active button {
+  @apply bg-primary;
+}
+
+.slick-dots li button {
+  @apply bg-muted;
+}

@@ -21,7 +21,7 @@ import {
   FormMessage,
 } from "~/components/ui/form";
 import { Input } from "~/components/ui/input";
-import { Mail, Loader2, Github, Chrome } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { Separator } from "~/components/ui/separator";
 import { IconGitHub, IconGoogle } from "~/components/common/Icons";
 import { Alert, AlertDescription } from "~/components/ui/alert";
@@ -137,14 +137,14 @@ function LoginModal({ isOpen, setIsOpen }: LoginModalProps) {
           <div className="mt-4 flex justify-center space-x-6">
             <div
               className="cursor-pointer rounded-full p-2 transition-colors hover:bg-accent"
-              onClick={() => signIn("github", { callbackUrl: "/" })}
+              onClick={() => signIn("github")}
             >
               <IconGitHub className="h-10 w-10" />
             </div>
 
             <div
               className="cursor-pointer rounded-full p-2 transition-colors hover:bg-accent"
-              onClick={() => signIn("google", { callbackUrl: "/" })}
+              onClick={() => signIn("google")}
             >
               <IconGoogle className="h-10 w-10" />
             </div>

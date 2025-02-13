@@ -7,6 +7,7 @@ import { TRPCReactProvider } from "~/trpc/react";
 import { ThemeProvider } from "~/components/providers/ThemesProvider";
 import UIProvider from "~/components/providers/UIProvider";
 import AuthProvider from "~/components/providers/AuthProvider";
+import { Toaster } from "~/components/ui/sonner";
 
 export const metadata: Metadata = {
   title: "智慧书城",
@@ -22,13 +23,13 @@ export default function RootLayout({
       <body>
         <AuthProvider>
           <TRPCReactProvider>
-          <ThemeProvider
-            attribute="class"
-            defaultTheme="system"
-            enableSystem
-            disableTransitionOnChange
-          >
-
+            <ThemeProvider
+              attribute="class"
+              defaultTheme="system"
+              enableSystem
+              disableTransitionOnChange
+            >
+              <Toaster position="top-right" duration={2000} />
               <UIProvider>{children}</UIProvider>
             </ThemeProvider>
           </TRPCReactProvider>
