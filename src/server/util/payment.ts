@@ -80,8 +80,8 @@ export const createCheckoutSession = async (
         },
       ],
       mode: "payment",
-      success_url: `${baseUrl}/payment/success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${baseUrl}/payment/cancel`,
+      success_url: `${baseUrl}/`,
+      cancel_url: `${baseUrl}/`,
       metadata,
     });
 

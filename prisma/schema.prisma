@@ -66,6 +66,8 @@ model User {
     ReadingHistory  ReadingHistory[]
     UserInterest    UserInterest[]
     BookInteraction BookInteraction[]
+    likes           Like[] // 点赞记录
+    views           View[] // 浏览记录
 }
 
 enum UserRole {
@@ -113,6 +115,8 @@ model Book {
     publisher   String?
     createdAt   DateTime   @default(now())
     updatedAt   DateTime   @updatedAt
+    viewCount   Int        @default(0) // 总浏览量
+    likeCount   Int        @default(0) // 总点赞数
 
     // 关联
     categoryId      String
@@ -122,6 +126,8 @@ model Book {
     favorites       Favorite[]
     ReadingHistory  ReadingHistory[]
     BookInteraction BookInteraction[]
+    likes           Like[] // 点赞关系
+    views           View[] // 浏览记录关系
 
     @@index([title])
     @@index([isbn])
@@ -318,4 +324,35 @@ model BookInteraction {
 
     @@index([userId])
     @@index([bookId])
+}
+
+model Like {
+    id        String   @id @default(cuid())
+    userId    String
+    bookId    String
+    createdAt DateTime @default(now())
+
+    // 关联
+    user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+    book Book @relation(fields: [bookId], references: [id], onDelete: Cascade)
+
+    @@unique([userId, bookId]) // 一个用户只能给一本书点一个赞
+    @@index([userId])
+    @@index([bookId])
+}
+
+// 浏览记录表
+model View {
+    id        String   @id @default(cuid())
+    userId    String
+    bookId    String
+    createdAt DateTime @default(now())
+
+    // 关联
+    user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+    book Book @relation(fields: [bookId], references: [id], onDelete: Cascade)
+
+    @@index([userId])
+    @@index([bookId])
+    @@index([createdAt])
 }

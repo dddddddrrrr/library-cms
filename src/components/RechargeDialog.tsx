@@ -9,9 +9,10 @@ import {
 } from "~/components/ui/dialog";
 import { Button } from "~/components/ui/button";
 import { Badge } from "~/components/ui/badge";
-import { Sparkles, Gift, Zap } from "lucide-react";
+import { Sparkles, Gift, Zap, Loader2 } from "lucide-react";
 import { api } from "~/trpc/react";
 import { toast } from "sonner";
+import { loadStripe } from "@stripe/stripe-js";
 
 interface RechargeOption {
   amount: number;
@@ -56,8 +57,14 @@ interface RechargeDialogProps {
   setIsOpen: (open: boolean) => void;
 }
 
-export default function RechargeDialog({ isOpen, setIsOpen }: RechargeDialogProps) {
-  const [selectedOption, setSelectedOption] = useState<RechargeOption | null>(null);
+export default function RechargeDialog({
+  isOpen,
+  setIsOpen,
+}: RechargeDialogProps) {
+  const [selectedOption, setSelectedOption] = useState<RechargeOption | null>(
+    rechargeOptions.find((option) => option.recommended) ?? null,
+  );
+  const [isLoading, setIsLoading] = useState(false);
 
   const { mutateAsync: createRechargeSession } =
     api.payment.createRechargeCheckoutSession.useMutation();
@@ -69,21 +76,36 @@ export default function RechargeDialog({ isOpen, setIsOpen }: RechargeDialogProp
     }
 
     try {
+      setIsLoading(true);
       const result = await createRechargeSession({
         amount: selectedOption.amount + selectedOption.bonus,
       });
 
       if (result.sessionId) {
-        window.location.href = `/payment/checkout?session_id=${result.sessionId}`;
+        const stripe = await loadStripe(
+          process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY ?? "",
+        );
+        if (stripe) {
+          await stripe.redirectToCheckout({ sessionId: result.sessionId });
+        } else {
+          console.error("Stripe failed to initialize.");
+          toast.error("支付初始化失败");
+        }
+      } else {
+        console.error("No session ID returned from server");
+        toast.error("创建支付会话失败");
       }
     } catch (error) {
+      console.error("Error creating checkout session:", error);
       toast.error("创建支付会话失败");
+    } finally {
+      setIsLoading(false);
     }
   };
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
-      <DialogContent className="sm:max-w-[600px]">
+      <DialogContent className="sm:max-w-[700px]">
         <DialogHeader>
           <DialogTitle className="text-center text-2xl font-semibold">
             账户充值
@@ -94,11 +116,15 @@ export default function RechargeDialog({ isOpen, setIsOpen }: RechargeDialogProp
           {rechargeOptions.map((option) => (
             <div
               key={option.amount}
-              className={`relative cursor-pointer rounded-lg border-2 p-4 transition-all hover:border-primary/50 hover:shadow-lg ${
+              className={`relative cursor-pointer rounded-lg p-4 transition-all hover:bg-muted/50 ${
                 selectedOption?.amount === option.amount
-                  ? "border-primary bg-primary/5"
-                  : "border-border"
-              } ${option.recommended ? "ring-2 ring-primary ring-offset-2" : ""}`}
+                  ? "bg-primary/5 ring-2 ring-primary"
+                  : "bg-card ring-1 ring-border"
+              } ${
+                option.recommended
+                  ? "before:absolute before:-top-2 before:left-1/2 before:-translate-x-1/2"
+                  : ""
+              }`}
               onClick={() => setSelectedOption(option)}
             >
               {option.recommended && (
@@ -110,7 +136,9 @@ export default function RechargeDialog({ isOpen, setIsOpen }: RechargeDialogProp
                 </Badge>
               )}
 
-              <div className="mb-4 flex items-center justify-center">{option.icon}</div>
+              <div className="mb-4 flex items-center justify-center">
+                {option.icon}
+              </div>
 
               <h3 className="mb-1 text-center text-lg font-semibold">
                 {option.title}
@@ -144,11 +172,22 @@ export default function RechargeDialog({ isOpen, setIsOpen }: RechargeDialogProp
           <Button variant="outline" onClick={() => setIsOpen(false)}>
             取消
           </Button>
-          <Button onClick={handleRecharge} disabled={!selectedOption}>
-            立即充值
+          <Button
+            onClick={handleRecharge}
+            disabled={!selectedOption || isLoading}
+            className="min-w-[100px]"
+          >
+            {isLoading ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                处理中
+              </>
+            ) : (
+              "立即充值"
+            )}
           </Button>
         </div>
       </DialogContent>
     </Dialog>
   );
-} 
+}

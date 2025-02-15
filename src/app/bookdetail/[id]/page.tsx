@@ -1,4 +1,5 @@
 import BookDetail from "~/components/BookDetail";
+
 const BookDetailPage = async ({
   params,
 }: {

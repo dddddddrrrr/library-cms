@@ -7,15 +7,13 @@ import { useSession } from "next-auth/react";
 import UserProfile from "~/components/user/UserProfile";
 import LoginModal from "~/components/LoginDialog";
 import { Search, BookOpen, Wallet, Plus } from "lucide-react";
-import { Input } from "~/components/ui/input";
 import { ThemeSwitch } from "~/components/ThemeSwitch";
-import { Badge } from "~/components/ui/badge";
 import RechargeDialog from "~/components/RechargeDialog";
-
+import { useLoginModal } from "~/hooks/useStore";
 export const Header: React.FC = () => {
   const router = useRouter();
   const { data: session } = useSession();
-  const [isOpen, setIsOpen] = useState(false);
+  const { isOpen, onOpen, onClose } = useLoginModal();
   const [isRechargeOpen, setIsRechargeOpen] = useState(false);
 
   return (
@@ -29,17 +27,6 @@ export const Header: React.FC = () => {
           >
             <BookOpen className="h-6 w-6 text-primary" />
             <span className="text-xl font-bold">智慧书城</span>
-          </div>
-
-          {/* 搜索框 */}
-          <div className="hidden flex-1 md:block lg:max-w-xl">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 transform text-muted-foreground" />
-              <Input
-                placeholder="搜索书籍、作者或分类..."
-                className="w-full bg-muted/50 pl-10"
-              />
-            </div>
           </div>
 
           {/* 用户相关 */}
@@ -75,16 +62,14 @@ export const Header: React.FC = () => {
               </div>
             ) : (
               <div className="flex gap-2">
-                <Button onClick={() => setIsOpen(true)}>登录</Button>
+                <Button onClick={() => onOpen(true)}>登录</Button>
               </div>
             )}
           </div>
         </div>
       </div>
 
-
-
-      <LoginModal isOpen={isOpen} setIsOpen={setIsOpen} />
+      <LoginModal isOpen={isOpen} onClose={() => onClose(false)} />
       <RechargeDialog isOpen={isRechargeOpen} setIsOpen={setIsRechargeOpen} />
     </header>
   );

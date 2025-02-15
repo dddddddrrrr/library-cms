@@ -2,51 +2,95 @@
 
 import { api } from "~/trpc/react";
 import Image from "next/image";
-import { Star, Heart, ShoppingCart, Eye } from "lucide-react";
+import { Star, Heart, ShoppingCart, Eye, Clock } from "lucide-react";
 import { Card } from "./ui/card";
 import { Button } from "./ui/button";
 import { Skeleton } from "./ui/skeleton";
 import { formatDate } from "~/lib/utils";
 import { Badge } from "./ui/badge";
-import { loadStripe } from "@stripe/stripe-js";
 import { useSession } from "next-auth/react";
+import PurchaseDialog from "~/components/PurchaseDialog";
+import { useState, useEffect } from "react";
+import { useRecommendedBooks } from "~/hooks/useRecommendedBooks";
+import { useRouter } from "next/navigation";
 
 const BookDetail = ({ id }: { id: string }) => {
   const { data: book, isLoading } = api.books.getBookById.useQuery({ id });
   const { data: session } = useSession();
-  console.log(session);
+  const [isPurchaseOpen, setIsPurchaseOpen] = useState(false);
+  const utils = api.useUtils();
+  const router = useRouter();
 
-  const { mutateAsync: createBookCheckoutSession } =
-    api.payment.createBookCheckoutSession.useMutation();
+  // 创建浏览记录
+  const createView = api.books.createView.useMutation();
 
-  const handleBuyBook = async () => {
-    try {
-      const result = await createBookCheckoutSession({
-        book: {
-          id: book?.id ?? "",
-          title: book?.title ?? "",
-          price: Number(book?.price) ?? 0,
-          cover: book?.cover ?? "",
-        },
-      });
-      if (result.sessionId) {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call
-        const stripe = await loadStripe(
-          process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY ?? "",
+  // 获取浏览量
+  const { data: viewCount } = api.books.getBookViews.useQuery({
+    bookId: id,
+  });
+
+  // 获取点赞状态
+  const { data: isLiked } = api.books.checkLiked.useQuery(
+    { bookId: id },
+    { enabled: !!session?.user },
+  );
+
+  // 点赞/取消点赞
+  const toggleLike = api.books.toggleLike.useMutation({
+    onMutate: async () => {
+      await utils.books.checkLiked.cancel({ bookId: id });
+      await utils.books.getBookById.cancel({ id });
+
+      const prevLiked = utils.books.checkLiked.getData({ bookId: id });
+      const prevBook = utils.books.getBookById.getData({ id });
+
+      utils.books.checkLiked.setData({ bookId: id }, !prevLiked);
+
+      if (prevBook) {
+        utils.books.getBookById.setData(
+          { id },
+          {
+            ...prevBook,
+            likeCount: prevBook.likeCount + (prevLiked ? -1 : 1),
+          },
         );
-        if (stripe) {
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
-          await stripe.redirectToCheckout({ sessionId: result.sessionId });
-        } else {
-          console.error("Stripe failed to initialize.");
-        }
-      } else {
-        console.error("No session ID returned from server");
       }
-    } catch (error) {
-      console.error("Error creating checkout session:", error);
+
+      return { prevLiked, prevBook };
+    },
+    onError: (err, newTodo, context) => {
+      if (context?.prevLiked !== undefined) {
+        utils.books.checkLiked.setData({ bookId: id }, context.prevLiked);
+      }
+      if (context?.prevBook) {
+        utils.books.getBookById.setData({ id }, context.prevBook);
+      }
+    },
+    onSettled: () => {
+      void utils.books.checkLiked.invalidate({ bookId: id });
+      void utils.books.getBookById.invalidate({ id });
+    },
+  });
+
+  const handleLike = () => {
+    if (!session) {
+      // 如果未登录，可以显示登录提示
+      return;
     }
+    toggleLike.mutate({ bookId: id });
   };
+
+  // 每次访问都创建浏览记录
+  useEffect(() => {
+    if (session?.user) {
+      createView.mutate({ bookId: id });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session, id]);
+
+  // 获取推荐图书
+  const { recommendedBooks, isLoading: isLoadingRecommendations } =
+    useRecommendedBooks(id);
 
   if (isLoading) {
     return <LoadingSkeleton />;
@@ -100,13 +144,20 @@ const BookDetail = ({ id }: { id: string }) => {
                   <div className="flex gap-2 pt-2">
                     <Button
                       className="flex-1 gap-2"
-                      onClick={() => handleBuyBook()}
+                      onClick={() => setIsPurchaseOpen(true)}
                     >
                       <ShoppingCart className="h-4 w-4" />
                       购买
                     </Button>
-                    <Button variant="outline" size="icon">
-                      <Heart className="h-4 w-4" />
+                    <Button
+                      variant={isLiked ? "default" : "outline"}
+                      size="icon"
+                      onClick={handleLike}
+                      disabled={toggleLike.isPending}
+                    >
+                      <Heart
+                        className={`h-4 w-4 ${isLiked ? "fill-current" : ""}`}
+                      />
                     </Button>
                   </div>
                 </div>
@@ -142,7 +193,11 @@ const BookDetail = ({ id }: { id: string }) => {
                     <Badge variant="outline">{book.category.name}</Badge>
                     <div className="flex items-center gap-1 text-sm text-muted-foreground">
                       <Eye className="h-4 w-4" />
-                      <span>{book.reviews.length} 次浏览</span>
+                      <span>{viewCount ?? 0} 次浏览</span>
+                    </div>
+                    <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                      <Clock className="h-4 w-4" />
+                      <span>最近更新: {formatDate(book.updatedAt)}</span>
                     </div>
                   </div>
                   <h1 className="mb-2 text-3xl font-bold tracking-tight">
@@ -195,14 +250,56 @@ const BookDetail = ({ id }: { id: string }) => {
               {/* 推荐阅读 */}
               <Card className="p-6">
                 <h3 className="mb-4 text-xl font-semibold">推荐阅读</h3>
-                <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4">
-                  {/* 这里可以添加相关推荐的图书 */}
-                </div>
+                {isLoadingRecommendations ? (
+                  <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4">
+                    {Array.from({ length: 4 }).map((_, i) => (
+                      <Skeleton key={i} className="aspect-[3/4]" />
+                    ))}
+                  </div>
+                ) : recommendedBooks.length > 0 ? (
+                  <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4">
+                    {recommendedBooks.slice(0, 4).map((book) => (
+                      <div
+                        key={book.id}
+                        className="group cursor-pointer"
+                        onClick={() => router.push(`/bookdetail/${book.id}`)}
+                      >
+                        <div className="relative aspect-[3/4] overflow-hidden rounded-md">
+                          <Image
+                            src={book.cover ?? ""}
+                            alt={book.title}
+                            fill
+                            className="object-cover transition-transform duration-300 group-hover:scale-110"
+                            sizes="(max-width: 768px) 50vw, 25vw"
+                          />
+                        </div>
+                        <div className="mt-2">
+                          <p className="line-clamp-1 font-medium">
+                            {book.title}
+                          </p>
+                          <p className="line-clamp-1 text-sm text-muted-foreground">
+                            {book.author}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-center text-muted-foreground">暂无推荐</p>
+                )}
               </Card>
             </div>
           </div>
         </div>
       </div>
+
+      {book && (
+        <PurchaseDialog
+          isOpen={isPurchaseOpen}
+          setIsOpen={setIsPurchaseOpen}
+          book={book}
+        />
+      )}
     </div>
   );
 };

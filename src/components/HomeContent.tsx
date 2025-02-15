@@ -11,21 +11,13 @@ import {
 import Image from "next/image";
 import { Skeleton } from "~/components/ui/skeleton";
 import { type Book } from "@prisma/client";
-import { useEffect, useState } from "react";
 import Slider, { type Settings } from "react-slick";
 import "slick-carousel/slick/slick.css";
 import "slick-carousel/slick/slick-theme.css";
 import { useRouter } from "next/navigation";
-
-// 工具函数：随机打乱数组
-function shuffleArray<T>(array: T[]): T[] {
-  const newArray = [...array];
-  for (let i = newArray.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [newArray[i], newArray[j]] = [newArray[j], newArray[i]] as [T, T];
-  }
-  return newArray;
-}
+import { useLoginModal } from "~/hooks/useStore";
+import { useSession } from "next-auth/react";
+import { useRecommendedBooks } from "~/hooks/useRecommendedBooks";
 
 const LoadingCard = () => {
   return (
@@ -43,10 +35,18 @@ const LoadingCard = () => {
 
 const BookCard = ({ book }: { book: Book }) => {
   const router = useRouter();
+  const { onOpen } = useLoginModal();
+  const { data: session } = useSession();
   return (
     <Card
       className="group h-full cursor-pointer overflow-hidden border-2 border-border/50 bg-[#F5F5F5] shadow-sm transition-all duration-300 hover:border-primary/30 hover:shadow-xl hover:shadow-primary/10 dark:bg-[#181818]"
-      onClick={() => router.push(`/bookdetail/${book.id}`)}
+      onClick={() => {
+        if (!session) {
+          onOpen(true);
+        } else {
+          router.push(`/bookdetail/${book.id}`);
+        }
+      }}
     >
       <CardHeader className="pb-3">
         <CardTitle className="line-clamp-1 text-lg font-bold tracking-tight">
@@ -72,12 +72,9 @@ const BookCard = ({ book }: { book: Book }) => {
   );
 };
 
-const RecommendedBooks = ({ books }: { books: Book[] }) => {
-  const [shuffledBooks, setShuffledBooks] = useState<Book[]>([]);
-
-  useEffect(() => {
-    setShuffledBooks(shuffleArray(books).slice(0, 21));
-  }, [books]);
+const RecommendedBooks = () => {
+  const { recommendedBooks, isLoading: isLoadingRecommendations } =
+    useRecommendedBooks("");
 
   const settings: Settings = {
     dots: false,
@@ -118,14 +115,27 @@ const RecommendedBooks = ({ books }: { books: Book[] }) => {
     ),
   };
 
-  if (!shuffledBooks.length) return null;
+  if (isLoadingRecommendations) {
+    return (
+      <section className="relative rounded-xl bg-muted/80 p-8 shadow-md">
+        <h2 className="mb-8 text-3xl font-bold tracking-tight">今日推荐</h2>
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <LoadingCard key={i} />
+          ))}
+        </div>
+      </section>
+    );
+  }
+
+  if (!recommendedBooks.length) return null;
 
   return (
     <section className="relative rounded-xl bg-muted/80 p-8 shadow-md">
       <h2 className="mb-8 text-3xl font-bold tracking-tight">今日推荐</h2>
       <div className="mx-auto max-w-7xl">
         <Slider {...settings}>
-          {shuffledBooks.map((book) => (
+          {recommendedBooks.map((book) => (
             <div key={book.id} className="px-1">
               <BookCard book={book} />
             </div>
@@ -174,7 +184,7 @@ const HomeContent = () => {
 
   return (
     <div className="space-y-16 bg-background p-6">
-      <RecommendedBooks books={books} />
+      <RecommendedBooks />
       <section>
         <h2 className="mb-8 text-3xl font-bold tracking-tight">全部图书</h2>
         <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">

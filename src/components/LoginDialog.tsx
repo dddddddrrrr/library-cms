@@ -33,10 +33,10 @@ const formSchema = z.object({
 
 interface LoginModalProps {
   isOpen: boolean;
-  setIsOpen: (isOpen: boolean) => void;
+  onClose: (isOpen: boolean) => void;
 }
 
-function LoginModal({ isOpen, setIsOpen }: LoginModalProps) {
+function LoginModal({ isOpen, onClose }: LoginModalProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -69,7 +69,7 @@ function LoginModal({ isOpen, setIsOpen }: LoginModalProps) {
   }
 
   return (
-    <Dialog open={isOpen} onOpenChange={setIsOpen}>
+    <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
           <DialogTitle className="text-center text-2xl font-semibold">
@@ -175,5 +175,4 @@ function LoginModal({ isOpen, setIsOpen }: LoginModalProps) {
     </Dialog>
   );
 }
-
 export default LoginModal;
