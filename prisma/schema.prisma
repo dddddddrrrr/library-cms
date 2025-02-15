@@ -46,24 +46,26 @@ model Session {
 }
 
 model User {
-    id            String    @id @default(cuid())
-    name          String?
-    email         String?   @unique
-    emailVerified DateTime?
-    image         String?
-    phone         String?   @unique
-    role          UserRole  @default(USER)
-    balance       Decimal   @default(0) @db.Decimal(10, 2) // 用户余额
-    createdAt     DateTime  @default(now())
-    updatedAt     DateTime  @updatedAt
-
-    accounts     Account[]
-    sessions     Session[]
-    orders       Order[]
-    reviews      Review[]
-    favorites    Favorite[]
-    recharges    Recharge[] // 充值记录
-    transactions Transaction[] // 交易流水
+    id              String            @id @default(cuid())
+    name            String?
+    email           String?           @unique
+    emailVerified   DateTime?
+    image           String?
+    phone           String?           @unique
+    role            UserRole          @default(USER)
+    balance         Decimal           @default(0) @db.Decimal(10, 2) // 用户余额
+    createdAt       DateTime          @default(now())
+    updatedAt       DateTime          @updatedAt
+    accounts        Account[]
+    sessions        Session[]
+    orders          Order[]
+    reviews         Review[]
+    favorites       Favorite[]
+    recharges       Recharge[] // 充值记录
+    transactions    Transaction[] // 交易流水
+    ReadingHistory  ReadingHistory[]
+    UserInterest    UserInterest[]
+    BookInteraction BookInteraction[]
 }
 
 enum UserRole {
@@ -113,11 +115,13 @@ model Book {
     updatedAt   DateTime   @updatedAt
 
     // 关联
-    categoryId String
-    category   Category    @relation(fields: [categoryId], references: [id])
-    orderItems OrderItem[]
-    reviews    Review[]
-    favorites  Favorite[]
+    categoryId      String
+    category        Category          @relation(fields: [categoryId], references: [id])
+    orderItems      OrderItem[]
+    reviews         Review[]
+    favorites       Favorite[]
+    ReadingHistory  ReadingHistory[]
+    BookInteraction BookInteraction[]
 
     @@index([title])
     @@index([isbn])
@@ -274,3 +278,44 @@ enum TransactionStatus {
     CANCELLED // 已取消
 }
 
+// 用户阅读历史
+model ReadingHistory {
+    id       String   @id @default(cuid())
+    userId   String
+    bookId   String
+    progress Float    @default(0) // 阅读进度
+    duration Int      @default(0) // 阅读时长(分钟)
+    lastRead DateTime @default(now())
+    user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+    book     Book     @relation(fields: [bookId], references: [id], onDelete: Cascade)
+
+    @@index([userId])
+    @@index([bookId])
+}
+
+// 用户兴趣标签
+model UserInterest {
+    id        String   @id @default(cuid())
+    userId    String
+    category  String // 分类/标签
+    weight    Float    @default(1.0) // 权重
+    updatedAt DateTime @updatedAt
+    user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+    @@index([userId])
+    @@index([category])
+}
+
+// 书籍互动记录
+model BookInteraction {
+    id        String   @id @default(cuid())
+    userId    String
+    bookId    String
+    type      String // 点击、收藏、分享等
+    createdAt DateTime @default(now())
+    user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+    book      Book     @relation(fields: [bookId], references: [id], onDelete: Cascade)
+
+    @@index([userId])
+    @@index([bookId])
+}

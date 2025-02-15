@@ -2,7 +2,7 @@
 
 import { useSession } from "next-auth/react";
 import { Avatar, AvatarFallback, AvatarImage } from "~/components/ui/avatar";
-import { cn, getUserInitials } from "~/lib/utils";
+import { cn } from "~/lib/utils";
 
 const UserAvatar = ({
   className,

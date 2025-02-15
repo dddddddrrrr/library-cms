@@ -22,3 +22,11 @@ export const getUserInitials = (name: string) => {
   const [firstName, lastName] = name.split(" ");
   return lastName ? `${firstName![0]}${lastName[0]}` : firstName!.slice(0, 2);
 };
+
+export const formatDate = (date: Date) => {
+  return date.toLocaleDateString("zh-CN", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
+};

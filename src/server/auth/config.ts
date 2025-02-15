@@ -21,12 +21,14 @@ declare module "next-auth" {
       image: string;
       role: UserRole;
       phone: string | null;
+      balance: number;
     } & DefaultSession["user"];
   }
 
   interface User {
     role: UserRole;
     phone: string | null;
+    balance: number;
   }
 }
 
@@ -37,6 +39,26 @@ declare module "next-auth" {
  */
 export const authConfig = {
   adapter: PrismaAdapter(db) as never, // 临时使用 any 类型解决适配器类型问题
+  callbacks: {
+    jwt: async ({ token, user }) => {
+      if (user) {
+        token.id = user.id;
+        token.role = user.role;
+        token.phone = user.phone;
+        token.balance = user.balance;
+      }
+      return token;
+    },
+    session: ({ session, token }) => {
+      if (token && session.user) {
+        session.user.id = token.id as string;
+        session.user.role = token.role as UserRole;
+        session.user.phone = token.phone as string | null;
+        session.user.balance = token.balance as number;
+      }
+      return session;
+    },
+  },
   providers: [
     GoogleProvider({
       clientId: env.AUTH_GOOGLE_ID,
@@ -47,15 +69,7 @@ export const authConfig = {
       clientSecret: env.AUTH_GITHUB_SECRET,
     }),
   ],
-  callbacks: {
-    session: ({ session, user }) => ({
-      ...session,
-      user: {
-        ...session.user,
-        id: user.id,
-        role: user.role,
-        phone: user.phone,
-      },
-    }),
+  session: {
+    strategy: "jwt",
   },
 } satisfies NextAuthConfig;
