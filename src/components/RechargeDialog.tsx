@@ -78,7 +78,8 @@ export default function RechargeDialog({
     try {
       setIsLoading(true);
       const result = await createRechargeSession({
-        amount: selectedOption.amount + selectedOption.bonus,
+        amount: selectedOption.amount,
+        bonus: selectedOption.bonus,
       });
 
       if (result.sessionId) {

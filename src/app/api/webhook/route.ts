@@ -7,7 +7,7 @@ export async function POST(req: Request) {
 
   try {
     const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-      apiVersion: "2025-01-27.acacia",
+      apiVersion: "2024-06-20.acacia",
       appInfo: {
         name: "nextjs-with-stripe-typescript-demo",
         url: "https://nextjs-with-stripe-typescript-demo.vercel.app",
@@ -51,6 +51,8 @@ export async function POST(req: Request) {
             amount: string;
           };
 
+          console.log(session.metadata, "session.metadata");
+
           if (!userId || !type || !amount) {
             console.error("Missing metadata for session ID:", session.id);
             return NextResponse.json(
@@ -63,6 +65,7 @@ export async function POST(req: Request) {
             const user = await db.user.findUnique({
               where: { id: userId },
             });
+            console.log(user, "user");
 
             if (!user) {
               throw new Error("User not found");
@@ -102,30 +105,50 @@ export async function POST(req: Request) {
 
               console.log(`Order created for user ${userId}, book ${bookId}`);
             } else {
-              // 充值到用户账户
-              await db.user.update({
+              const actualAmount = parseFloat(amount);
+              const bonusAmount = RECHARGE_BONUS_MAP[actualAmount] ?? 0;
+              const totalAmount = actualAmount + bonusAmount;
+
+              // 更新用户余额
+              const updatedUser = await db.user.update({
                 where: { id: userId },
                 data: {
                   balance: {
-                    increment: parseFloat(amount),
+                    increment: totalAmount,
                   },
                 },
               });
 
-              console.log(`Credit added for user ${userId}: ${amount}`);
-            }
+              // 创建充值记录
+              await db.recharge.create({
+                data: {
+                  userId,
+                  amount: totalAmount,
+                  status: "SUCCESS",
+                  tradeNo: session.id,
+                  channel: "BANK_CARD",
+                },
+              });
 
-            // 记录交易
-            await db.transaction.create({
-              data: {
-                userId,
-                amount: parseFloat(amount),
-                type: type === "BOOK" ? "PAYMENT" : "RECHARGE",
-                status: "SUCCESS",
-                balance: user.balance.toNumber(),
-                description: type === "BOOK" ? "购买图书" : "账户充值",
-              },
-            });
+              console.log(
+                `Credit added for user ${userId}: ${totalAmount} (including bonus: ${bonusAmount})`,
+              );
+
+              // 记录交易
+              await db.transaction.create({
+                data: {
+                  userId,
+                  amount: totalAmount,
+                  type: "RECHARGE",
+                  status: "SUCCESS",
+                  balance: updatedUser.balance.toNumber(),
+                  description:
+                    bonusAmount > 0
+                      ? `账户充值 (含赠送${bonusAmount}元)`
+                      : "账户充值",
+                },
+              });
+            }
 
             return NextResponse.json({ success: true });
           } catch (error) {
@@ -171,3 +194,10 @@ export async function POST(req: Request) {
 
   return NextResponse.json({ received: true }, { status: 200 });
 }
+
+// 添加充值赠送金额映射
+const RECHARGE_BONUS_MAP: Record<number, number> = {
+  100: 10, // 充100送10
+  200: 30, // 充200送30
+  500: 100, // 充500送100
+};

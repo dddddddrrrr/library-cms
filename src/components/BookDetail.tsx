@@ -13,6 +13,8 @@ import PurchaseDialog from "~/components/PurchaseDialog";
 import { useState, useEffect } from "react";
 import { useRecommendedBooks } from "~/hooks/useRecommendedBooks";
 import { useRouter } from "next/navigation";
+import { useLoginModal } from "~/hooks/useStore";
+import { motion, AnimatePresence } from "framer-motion";
 
 const BookDetail = ({ id }: { id: string }) => {
   const { data: book, isLoading } = api.books.getBookById.useQuery({ id });
@@ -20,6 +22,7 @@ const BookDetail = ({ id }: { id: string }) => {
   const [isPurchaseOpen, setIsPurchaseOpen] = useState(false);
   const utils = api.useUtils();
   const router = useRouter();
+  const { onOpen } = useLoginModal();
 
   // 创建浏览记录
   const createView = api.books.createView.useMutation();
@@ -74,7 +77,7 @@ const BookDetail = ({ id }: { id: string }) => {
 
   const handleLike = () => {
     if (!session) {
-      // 如果未登录，可以显示登录提示
+      onOpen(true);
       return;
     }
     toggleLike.mutate({ bookId: id });
@@ -107,16 +110,29 @@ const BookDetail = ({ id }: { id: string }) => {
   return (
     <div className="min-h-screen bg-muted/30">
       {/* 顶部背景 */}
-      <div className="relative h-[40vh] w-full overflow-hidden bg-gradient-to-b from-primary/10 to-background">
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        className="relative h-[40vh] w-full overflow-hidden bg-gradient-to-b from-primary/10 to-background"
+      >
         <div className="absolute inset-0 backdrop-blur-3xl" />
-      </div>
+      </motion.div>
 
       {/* 主要内容 */}
       <div className="relative mx-auto max-w-7xl px-4 py-8">
-        <div className="lg:-mt-60">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="lg:-mt-60"
+        >
           <div className="grid gap-8 lg:grid-cols-[380px,1fr]">
             {/* 左侧封面 */}
-            <div className="space-y-6">
+            <motion.div
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.2 }}
+              className="space-y-6"
+            >
               <Card className="overflow-hidden p-4">
                 <div className="relative aspect-[3/4] w-full overflow-hidden rounded-lg">
                   <Image
@@ -183,10 +199,15 @@ const BookDetail = ({ id }: { id: string }) => {
                   </div>
                 </div>
               </Card>
-            </div>
+            </motion.div>
 
             {/* 右侧信息 */}
-            <div className="space-y-6">
+            <motion.div
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.3 }}
+              className="space-y-6"
+            >
               <Card className="p-6">
                 <div className="mb-6">
                   <div className="mb-2 flex items-center gap-2">
@@ -250,47 +271,70 @@ const BookDetail = ({ id }: { id: string }) => {
               {/* 推荐阅读 */}
               <Card className="p-6">
                 <h3 className="mb-4 text-xl font-semibold">推荐阅读</h3>
-                {isLoadingRecommendations ? (
-                  <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4">
-                    {Array.from({ length: 4 }).map((_, i) => (
-                      <Skeleton key={i} className="aspect-[3/4]" />
-                    ))}
-                  </div>
-                ) : recommendedBooks.length > 0 ? (
-                  <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4">
-                    {recommendedBooks.slice(0, 4).map((book) => (
-                      <div
-                        key={book.id}
-                        className="group cursor-pointer"
-                        onClick={() => router.push(`/bookdetail/${book.id}`)}
-                      >
-                        <div className="relative aspect-[3/4] overflow-hidden rounded-md">
-                          <Image
-                            src={book.cover ?? ""}
-                            alt={book.title}
-                            fill
-                            className="object-cover transition-transform duration-300 group-hover:scale-110"
-                            sizes="(max-width: 768px) 50vw, 25vw"
-                          />
-                        </div>
-                        <div className="mt-2">
-                          <p className="line-clamp-1 font-medium">
-                            {book.title}
-                          </p>
-                          <p className="line-clamp-1 text-sm text-muted-foreground">
-                            {book.author}
-                          </p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-center text-muted-foreground">暂无推荐</p>
-                )}
+                <AnimatePresence mode="wait">
+                  {isLoadingRecommendations ? (
+                    <motion.div
+                      key="loading"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4"
+                    >
+                      {Array.from({ length: 4 }).map((_, i) => (
+                        <Skeleton key={i} className="aspect-[3/4]" />
+                      ))}
+                    </motion.div>
+                  ) : recommendedBooks.length > 0 ? (
+                    <motion.div
+                      key="content"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4"
+                    >
+                      {recommendedBooks.slice(0, 4).map((book, index) => (
+                        <motion.div
+                          key={book.id}
+                          initial={{ opacity: 0, y: 20 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ delay: index * 0.1 }}
+                          className="group cursor-pointer"
+                          onClick={() => router.push(`/bookdetail/${book.id}`)}
+                        >
+                          <div className="relative aspect-[3/4] overflow-hidden rounded-md">
+                            <Image
+                              src={book.cover ?? ""}
+                              alt={book.title}
+                              fill
+                              className="object-cover transition-transform duration-300 group-hover:scale-110"
+                              sizes="(max-width: 768px) 50vw, 25vw"
+                            />
+                          </div>
+                          <div className="mt-2">
+                            <p className="line-clamp-1 font-medium">
+                              {book.title}
+                            </p>
+                            <p className="line-clamp-1 text-sm text-muted-foreground">
+                              {book.author}
+                            </p>
+                          </div>
+                        </motion.div>
+                      ))}
+                    </motion.div>
+                  ) : (
+                    <motion.p
+                      key="empty"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      className="text-center text-muted-foreground"
+                    >
+                      暂无推荐
+                    </motion.p>
+                  )}
+                </AnimatePresence>
               </Card>
-            </div>
+            </motion.div>
           </div>
-        </div>
+        </motion.div>
       </div>
 
       {book && (

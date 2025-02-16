@@ -38,7 +38,12 @@ const UserProfile = () => {
             <User className="mr-2 h-5 w-4" />
             个人中心
           </div>
-          <div className="flex cursor-pointer rounded-lg px-2 py-2 text-sm hover:bg-gray-100 dark:hover:bg-[#2D2D2D]">
+          <div
+            className="flex cursor-pointer rounded-lg px-2 py-2 text-sm hover:bg-gray-100 dark:hover:bg-[#2D2D2D]"
+            onClick={() => {
+              router.push(`/deposit/${session?.user.id}`);
+            }}
+          >
             <Bell className="mr-2 h-5 w-4" />
             充值记录
           </div>

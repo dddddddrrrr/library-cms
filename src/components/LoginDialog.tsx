@@ -25,6 +25,9 @@ import { Loader2 } from "lucide-react";
 import { Separator } from "~/components/ui/separator";
 import { IconGitHub, IconGoogle } from "~/components/common/Icons";
 import { Alert, AlertDescription } from "~/components/ui/alert";
+import { useRouter } from "next/navigation";
+import { motion, AnimatePresence } from "framer-motion";
+import { toast } from "sonner";
 
 const formSchema = z.object({
   email: z.string().email("请输入有效的邮箱地址"),
@@ -39,7 +42,7 @@ interface LoginModalProps {
 function LoginModal({ isOpen, onClose }: LoginModalProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
+  const router = useRouter();
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -52,7 +55,7 @@ function LoginModal({ isOpen, onClose }: LoginModalProps) {
     try {
       setIsLoading(true);
       setError(null);
-      const result = await signIn("email", {
+      const result = await signIn("credentials", {
         email: values.email,
         password: values.password,
         redirect: false,
@@ -60,7 +63,14 @@ function LoginModal({ isOpen, onClose }: LoginModalProps) {
 
       if (result?.error) {
         setError("邮箱或密码错误");
+        return;
       }
+
+      // 登录成功
+      toast.success("登录成功");
+      router.push("/");
+      onClose(false);
+      router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "登录失败，请重试");
     } finally {
@@ -68,111 +78,156 @@ function LoginModal({ isOpen, onClose }: LoginModalProps) {
     }
   }
 
+  const handleRegister = () => {
+    onClose(false);
+    router.push("/register");
+  };
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[425px]">
-        <DialogHeader>
-          <DialogTitle className="text-center text-2xl font-semibold">
-            登录
-          </DialogTitle>
-        </DialogHeader>
-
-        {error && (
-          <Alert variant="destructive" className="mt-2">
-            <AlertDescription>{error}</AlertDescription>
-          </Alert>
-        )}
-
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <FormField
-              control={form.control}
-              name="email"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>邮箱地址</FormLabel>
-                  <FormControl>
-                    <Input
-                      placeholder="your@email.com"
-                      {...field}
-                      disabled={isLoading}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="password"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>密码</FormLabel>
-                  <FormControl>
-                    <Input type="password" {...field} disabled={isLoading} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <Button type="submit" className="w-full" disabled={isLoading}>
-              {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3 }}
+        >
+          <DialogHeader>
+            <DialogTitle className="text-center text-2xl font-semibold">
               登录
+            </DialogTitle>
+          </DialogHeader>
+
+          <AnimatePresence mode="wait">
+            {error && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                exit={{ opacity: 0, height: 0 }}
+                transition={{ duration: 0.2 }}
+              >
+                <Alert variant="destructive" className="mt-2">
+                  <AlertDescription>{error}</AlertDescription>
+                </Alert>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          <Form {...form}>
+            <motion.form
+              onSubmit={form.handleSubmit(onSubmit)}
+              className="space-y-4"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.1 }}
+            >
+              <FormField
+                control={form.control}
+                name="email"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>邮箱地址</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="your@email.com"
+                        {...field}
+                        disabled={isLoading}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="password"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>密码</FormLabel>
+                    <FormControl>
+                      <Input type="password" {...field} disabled={isLoading} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <Button type="submit" className="w-full" disabled={isLoading}>
+                {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                登录
+              </Button>
+            </motion.form>
+          </Form>
+
+          <motion.div
+            className="mt-6"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.2 }}
+          >
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center">
+                <Separator />
+              </div>
+              <div className="relative flex justify-center text-xs uppercase">
+                <span className="bg-background px-2 text-muted-foreground">
+                  或使用以下方式登录
+                </span>
+              </div>
+            </div>
+
+            <motion.div
+              className="mt-4 flex justify-center space-x-6"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.3 }}
+            >
+              <motion.div
+                className="cursor-pointer rounded-full p-2 transition-colors hover:bg-accent"
+                whileHover={{ scale: 1.1 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={() => signIn("github")}
+              >
+                <IconGitHub className="h-10 w-10" />
+              </motion.div>
+
+              <motion.div
+                className="cursor-pointer rounded-full p-2 transition-colors hover:bg-accent"
+                whileHover={{ scale: 1.1 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={() => signIn("google")}
+              >
+                <IconGoogle className="h-10 w-10" />
+              </motion.div>
+            </motion.div>
+          </motion.div>
+
+          <motion.div
+            className="mt-4 flex justify-between text-sm"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.4 }}
+          >
+            <Button
+              variant="link"
+              className="h-auto p-0 text-muted-foreground"
+              onClick={() => {
+                onClose(false);
+                router.push("/forget-password");
+              }}
+            >
+              忘记密码？
             </Button>
-          </form>
-        </Form>
-
-        <div className="mt-6">
-          <div className="relative">
-            <div className="absolute inset-0 flex items-center">
-              <Separator />
-            </div>
-            <div className="relative flex justify-center text-xs uppercase">
-              <span className="bg-background px-2 text-muted-foreground">
-                或使用以下方式登录
-              </span>
-            </div>
-          </div>
-
-          <div className="mt-4 flex justify-center space-x-6">
-            <div
-              className="cursor-pointer rounded-full p-2 transition-colors hover:bg-accent"
-              onClick={() => signIn("github")}
+            <Button
+              variant="link"
+              className="h-auto p-0 text-muted-foreground"
+              onClick={handleRegister}
             >
-              <IconGitHub className="h-10 w-10" />
-            </div>
-
-            <div
-              className="cursor-pointer rounded-full p-2 transition-colors hover:bg-accent"
-              onClick={() => signIn("google")}
-            >
-              <IconGoogle className="h-10 w-10" />
-            </div>
-          </div>
-        </div>
-
-        <div className="mt-4 flex justify-between text-sm">
-          <Button
-            variant="link"
-            className="h-auto p-0 text-muted-foreground"
-            onClick={() => {
-              // TODO: 实现忘记密码逻辑
-            }}
-          >
-            忘记密码？
-          </Button>
-          <Button
-            variant="link"
-            className="h-auto p-0 text-muted-foreground"
-            onClick={() => {
-              // TODO: 实现注册逻辑
-            }}
-          >
-            注册账号
-          </Button>
-        </div>
+              注册账号
+            </Button>
+          </motion.div>
+        </motion.div>
       </DialogContent>
     </Dialog>
   );
 }
+
 export default LoginModal;

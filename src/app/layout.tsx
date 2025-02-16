@@ -8,6 +8,7 @@ import { ThemeProvider } from "~/components/providers/ThemesProvider";
 import UIProvider from "~/components/providers/UIProvider";
 import AuthProvider from "~/components/providers/AuthProvider";
 import { Toaster } from "~/components/ui/sonner";
+import Script from "next/script";
 
 export const metadata: Metadata = {
   title: "智慧书城",
@@ -21,7 +22,6 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${GeistSans.variable}`}>
       <body>
-        {" "}
         <TRPCReactProvider>
           <AuthProvider>
             <ThemeProvider
@@ -30,6 +30,7 @@ export default function RootLayout({
               enableSystem
               disableTransitionOnChange
             >
+              <Script src="https://js.stripe.com/v3/" strategy="lazyOnload" />
               <Toaster position="top-right" duration={2000} />
               <UIProvider>{children}</UIProvider>
             </ThemeProvider>

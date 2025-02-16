@@ -10,11 +10,16 @@ import { Search, BookOpen, Wallet, Plus } from "lucide-react";
 import { ThemeSwitch } from "~/components/ThemeSwitch";
 import RechargeDialog from "~/components/RechargeDialog";
 import { useLoginModal } from "~/hooks/useStore";
+import { api } from "~/trpc/react";
+
 export const Header: React.FC = () => {
   const router = useRouter();
   const { data: session } = useSession();
   const { isOpen, onOpen, onClose } = useLoginModal();
   const [isRechargeOpen, setIsRechargeOpen] = useState(false);
+  const { data: balance } = api.users.fetchUserBalance.useQuery(undefined, {
+    enabled: !!session,
+  });
 
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -51,10 +56,15 @@ export const Header: React.FC = () => {
                     className="flex cursor-pointer items-center gap-2 rounded-full bg-muted/50 px-4 py-2 hover:bg-muted"
                     onClick={() => setIsRechargeOpen(true)}
                   >
-                    <Wallet className="h-4 w-4 text-muted-foreground" />
-                    <span className="font-medium">
-                      ¥{session.user.balance ?? "0.00"}
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <Wallet className="h-4 w-4 text-muted-foreground" />
+                      <span>
+                        余额：
+                        <span className="font-medium">
+                          ¥{balance ?? "0.00"}
+                        </span>
+                      </span>
+                    </div>
                     <Plus className="h-4 w-4 text-muted-foreground" />
                   </div>
                 </div>

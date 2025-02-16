@@ -4,16 +4,23 @@ import { TRPCError } from "@trpc/server";
 
 export const booksRouter = createTRPCRouter({
   fetchBooks: publicProcedure.query(async ({ ctx }) => {
-    const books = await ctx.db.book.findMany({
-      include: {
-        category: true,
-      },
-      orderBy: {
-        createdAt: "desc",
-      },
-    });
-
-    return books;
+    try {
+      const books = await ctx.db.book.findMany({
+        include: {
+          category: true,
+        },
+        orderBy: {
+          createdAt: "desc",
+        },
+      });
+      return books;
+    } catch (error) {
+      console.error("Fetch books error:", error);
+      throw new TRPCError({
+        code: "INTERNAL_SERVER_ERROR",
+        message: "获取图书列表失败",
+      });
+    }
   }),
 
   // 获取单本书籍详情
