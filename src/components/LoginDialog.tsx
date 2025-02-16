@@ -158,49 +158,6 @@ function LoginModal({ isOpen, onClose }: LoginModalProps) {
           </Form>
 
           <motion.div
-            className="mt-6"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.2 }}
-          >
-            <div className="relative">
-              <div className="absolute inset-0 flex items-center">
-                <Separator />
-              </div>
-              <div className="relative flex justify-center text-xs uppercase">
-                <span className="bg-background px-2 text-muted-foreground">
-                  或使用以下方式登录
-                </span>
-              </div>
-            </div>
-
-            <motion.div
-              className="mt-4 flex justify-center space-x-6"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.3 }}
-            >
-              <motion.div
-                className="cursor-pointer rounded-full p-2 transition-colors hover:bg-accent"
-                whileHover={{ scale: 1.1 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={() => signIn("github")}
-              >
-                <IconGitHub className="h-10 w-10" />
-              </motion.div>
-
-              <motion.div
-                className="cursor-pointer rounded-full p-2 transition-colors hover:bg-accent"
-                whileHover={{ scale: 1.1 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={() => signIn("google")}
-              >
-                <IconGoogle className="h-10 w-10" />
-              </motion.div>
-            </motion.div>
-          </motion.div>
-
-          <motion.div
             className="mt-4 flex justify-between text-sm"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}

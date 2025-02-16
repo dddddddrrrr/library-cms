@@ -6,7 +6,7 @@ import {
   DropdownMenuContent,
   DropdownMenuTrigger,
 } from "~/components/ui/dropdown-menu";
-import { User, Bell, LogOut } from "lucide-react";
+import { User, Bell, LogOut, Book } from "lucide-react";
 import UserAvatar from "~/components/user/UserAvatar";
 import { signOut } from "next-auth/react";
 
@@ -46,6 +46,15 @@ const UserProfile = () => {
           >
             <Bell className="mr-2 h-5 w-4" />
             充值记录
+          </div>
+          <div
+            className="flex cursor-pointer rounded-lg px-2 py-2 text-sm hover:bg-gray-100 dark:hover:bg-[#2D2D2D]"
+            onClick={() => {
+              router.push(`/my-book/${session?.user.id}`);
+            }}
+          >
+            <Book className="mr-2 h-5 w-4" />
+            我的书架
           </div>
           <div
             onClick={async () => {

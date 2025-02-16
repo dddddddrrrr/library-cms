@@ -2,7 +2,7 @@
 
 import { api } from "~/trpc/react";
 import Image from "next/image";
-import { Star, Heart, ShoppingCart, Eye, Clock } from "lucide-react";
+import { Heart, ShoppingCart, Eye, Clock, Trash2, Star } from "lucide-react";
 import { Card } from "./ui/card";
 import { Button } from "./ui/button";
 import { Skeleton } from "./ui/skeleton";
@@ -15,6 +15,18 @@ import { useRecommendedBooks } from "~/hooks/useRecommendedBooks";
 import { useRouter } from "next/navigation";
 import { useLoginModal } from "~/hooks/useStore";
 import { motion, AnimatePresence } from "framer-motion";
+import { Textarea } from "./ui/textarea";
+import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
+import { cn } from "~/lib/utils";
+import { toast } from "sonner";
+import { Loader2 } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "./ui/dialog";
 
 const BookDetail = ({ id }: { id: string }) => {
   const { data: book, isLoading } = api.books.getBookById.useQuery({ id });
@@ -23,6 +35,8 @@ const BookDetail = ({ id }: { id: string }) => {
   const utils = api.useUtils();
   const router = useRouter();
   const { onOpen } = useLoginModal();
+  const [comment, setComment] = useState("");
+  const [commentToDelete, setCommentToDelete] = useState<string | null>(null);
 
   // 创建浏览记录
   const createView = api.books.createView.useMutation();
@@ -94,6 +108,55 @@ const BookDetail = ({ id }: { id: string }) => {
   // 获取推荐图书
   const { recommendedBooks, isLoading: isLoadingRecommendations } =
     useRecommendedBooks(id);
+
+  // 获取评论列表
+  const { data: comments, isLoading: isLoadingComments } =
+    api.books.getBookComments.useQuery({
+      bookId: id,
+      limit: 10,
+    });
+
+  // 创建评论
+  const createComment = api.books.createComment.useMutation({
+    onSuccess: () => {
+      setComment("");
+      void utils.books.getBookComments.invalidate({ bookId: id });
+      toast.success("评论发表成功");
+    },
+  });
+
+  // 删除评论
+  const deleteComment = api.books.deleteComment.useMutation({
+    onSuccess: () => {
+      void utils.books.getBookComments.invalidate({ bookId: id });
+      toast.success("评论已删除");
+    },
+  });
+
+  // 点赞评论
+  const toggleCommentLike = api.books.toggleCommentLike.useMutation({
+    onSuccess: () => {
+      void utils.books.getBookComments.invalidate({ bookId: id });
+    },
+  });
+
+  const handleSubmitComment = () => {
+    if (!session) {
+      onOpen(true);
+      return;
+    }
+
+    if (!comment.trim()) {
+      toast.error("请输入评论内容");
+      return;
+    }
+
+    createComment.mutate({
+      bookId: id,
+      content: comment.trim(),
+      rating: 5, // 默认评分，由于我们不再使用评分系统
+    });
+  };
 
   if (isLoading) {
     return <LoadingSkeleton />;
@@ -332,6 +395,137 @@ const BookDetail = ({ id }: { id: string }) => {
                   )}
                 </AnimatePresence>
               </Card>
+
+              {/* 评论区域 */}
+              <Card className="mt-6 p-6">
+                <h3 className="mb-4 text-xl font-semibold">读者评论</h3>
+
+                {/* 评论输入框 */}
+                {session && (
+                  <div className="mb-6 space-y-4">
+                    <div className="flex items-center gap-4">
+                      <Avatar className="h-10 w-10">
+                        <AvatarImage src={session.user.image ?? ""} />
+                        <AvatarFallback>
+                          {session.user.name?.slice(0, 2).toUpperCase()}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="flex-1">
+                        <Textarea
+                          placeholder="分享你的想法..."
+                          value={comment}
+                          onChange={(e) => setComment(e.target.value)}
+                          rows={3}
+                        />
+                      </div>
+                    </div>
+                    <div className="flex justify-end">
+                      <Button
+                        onClick={handleSubmitComment}
+                        disabled={createComment.isPending}
+                      >
+                        {createComment.isPending && (
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        )}
+                        发表评论
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
+                {/* 评论列表 */}
+                <div className="space-y-6">
+                  {isLoadingComments ? (
+                    // 加载状态
+                    <div className="space-y-4">
+                      {Array.from({ length: 3 }).map((_, i) => (
+                        <Skeleton key={i} className="h-32" />
+                      ))}
+                    </div>
+                  ) : comments?.items.length === 0 ? (
+                    // 空状态
+                    <p className="py-8 text-center text-muted-foreground">
+                      暂无评论，来发表第一条评论吧
+                    </p>
+                  ) : (
+                    // 评论列表
+                    comments?.items.map((comment) => (
+                      <motion.div
+                        key={comment.id}
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="relative rounded-lg border p-4"
+                      >
+                        <div className="flex items-start justify-between">
+                          <div className="flex items-start gap-3">
+                            <Avatar className="h-8 w-8">
+                              <AvatarImage src={comment.user.image ?? ""} />
+                              <AvatarFallback>
+                                {comment.user.name?.slice(0, 2).toUpperCase()}
+                              </AvatarFallback>
+                            </Avatar>
+                            <div>
+                              <span className="font-medium">
+                                {comment.user.name}
+                              </span>
+                              <p className="mt-1 text-sm text-muted-foreground">
+                                {formatDate(comment.createdAt)}
+                              </p>
+                            </div>
+                          </div>
+
+                          {/* 操作按钮 */}
+                          <div className="flex items-center gap-2">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                if (!session) {
+                                  onOpen(true);
+                                  return;
+                                }
+                                toggleCommentLike.mutate({
+                                  commentId: comment.id,
+                                });
+                              }}
+                              className={cn(
+                                "gap-1.5",
+                                comment.likes.some(
+                                  (like) => like.userId === session?.user.id,
+                                ) && "text-primary",
+                              )}
+                            >
+                              <Heart
+                                className={cn(
+                                  "h-4 w-4",
+                                  comment.likes.some(
+                                    (like) => like.userId === session?.user.id,
+                                  ) && "fill-primary",
+                                )}
+                              />
+                              <span>{comment.likes.length}</span>
+                            </Button>
+
+                            {session?.user.id === comment.userId && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setCommentToDelete(comment.id)}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+
+                        <p className="mt-3 whitespace-pre-wrap text-sm">
+                          {comment.content}
+                        </p>
+                      </motion.div>
+                    ))
+                  )}
+                </div>
+              </Card>
             </motion.div>
           </div>
         </motion.div>
@@ -344,6 +538,44 @@ const BookDetail = ({ id }: { id: string }) => {
           book={book}
         />
       )}
+
+      <Dialog
+        open={!!commentToDelete}
+        onOpenChange={() => setCommentToDelete(null)}
+      >
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>删除评论</DialogTitle>
+            <DialogDescription>
+              确定要删除这条评论吗？此操作无法撤销。
+            </DialogDescription>
+          </DialogHeader>
+          <div className="mt-4 flex justify-end gap-3">
+            <Button variant="outline" onClick={() => setCommentToDelete(null)}>
+              取消
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                if (commentToDelete) {
+                  deleteComment.mutate({ commentId: commentToDelete });
+                  setCommentToDelete(null);
+                }
+              }}
+              disabled={deleteComment.isPending}
+            >
+              {deleteComment.isPending ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  删除中
+                </>
+              ) : (
+                "确认删除"
+              )}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
