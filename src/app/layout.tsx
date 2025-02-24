@@ -5,7 +5,7 @@ import { type Metadata } from "next";
 
 import { TRPCReactProvider } from "~/trpc/react";
 import { ThemeProvider } from "~/components/providers/ThemesProvider";
-import UIProvider from "~/components/providers/UIProvider";
+
 import AuthProvider from "~/components/providers/AuthProvider";
 import { Toaster } from "~/components/ui/sonner";
 import Script from "next/script";
@@ -32,7 +32,7 @@ export default function RootLayout({
             >
               <Script src="https://js.stripe.com/v3/" strategy="lazyOnload" />
               <Toaster position="top-right" duration={2000} />
-              <UIProvider>{children}</UIProvider>
+              {children}
             </ThemeProvider>
           </AuthProvider>
         </TRPCReactProvider>

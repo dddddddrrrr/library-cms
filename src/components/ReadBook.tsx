@@ -13,7 +13,6 @@ import {
   Settings,
   Sun,
   Moon,
-  Bookmark,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -26,7 +25,6 @@ import {
 import { ScrollArea } from "./ui/scroll-area";
 import { cn } from "~/lib/utils";
 import { useTheme } from "next-themes";
-import { useLoginModal } from "~/hooks/useStore";
 
 interface ReadBookProps {
   bookId: string;
@@ -36,7 +34,7 @@ interface ReadBookProps {
 const ReadBook = ({ bookId, chapterId }: ReadBookProps) => {
   const { data: session } = useSession();
   const router = useRouter();
-  const { onOpen } = useLoginModal();
+
   const { theme, setTheme } = useTheme();
   const [fontSize, setFontSize] = useState(18);
   const [showToolbar, setShowToolbar] = useState(true);

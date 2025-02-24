@@ -2,6 +2,7 @@ import { z } from "zod";
 import { createTRPCRouter, protectedProcedure, publicProcedure } from "../trpc";
 import { TRPCError } from "@trpc/server";
 import * as bcrypt from "bcrypt";
+import { Decimal } from "@prisma/client/runtime/library";
 
 export const usersRouter = createTRPCRouter({
   getUser: protectedProcedure
@@ -30,6 +31,23 @@ export const usersRouter = createTRPCRouter({
         });
       }
     }),
+  fetchUserInfo: protectedProcedure.query(async ({ ctx }) => {
+    const user = await ctx.db.user.findUnique({
+      where: { id: ctx.session.user.id },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        role: true,
+        balance: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
+
+    return user;
+  }),
+
   fetchUserBalance: protectedProcedure.query(async ({ ctx }) => {
     const user = await ctx.db.user.findUnique({
       where: { id: ctx.session.user.id },
@@ -361,5 +379,119 @@ export const usersRouter = createTRPCRouter({
           error: "更新密码失败",
         };
       }
+    }),
+
+  fetchAllUsers: protectedProcedure
+    .input(
+      z.object({
+        page: z.number().min(1).default(1),
+        pageSize: z.number().min(1).max(100).default(10),
+        search: z.string().optional(),
+        email: z.string().optional(),
+        role: z.enum(["ADMIN", "USER"]).optional(),
+        balanceRange: z
+          .object({
+            min: z.number().optional(),
+            max: z.number().optional(),
+          })
+          .optional(),
+        dateRange: z
+          .object({
+            from: z.date().optional(),
+            to: z.date().optional(),
+          })
+          .optional(),
+        sortBy: z.enum(["createdAt", "name", "email", "balance"]).optional(),
+        sortOrder: z.enum(["asc", "desc"]).optional(),
+      }),
+    )
+    .query(async ({ ctx, input }) => {
+      const {
+        page,
+        pageSize,
+        search,
+        email,
+        role,
+        balanceRange,
+        dateRange,
+        sortBy,
+        sortOrder,
+      } = input;
+      const skip = (page - 1) * pageSize;
+
+      const where = {
+        AND: [
+          // 搜索条件
+          search
+            ? {
+                OR: [
+                  { name: { contains: search, mode: "insensitive" as const } },
+                  { email: { contains: search, mode: "insensitive" as const } },
+                ],
+              }
+            : {},
+          // 精确邮箱匹配
+          email ? { email: { equals: email } } : {},
+          // 角色筛选
+          role ? { role } : {},
+          // 余额范围
+          balanceRange
+            ? {
+                balance: {
+                  gte: balanceRange.min
+                    ? new Decimal(balanceRange.min)
+                    : undefined,
+                  lte: balanceRange.max
+                    ? new Decimal(balanceRange.max)
+                    : undefined,
+                },
+              }
+            : {},
+          // 创建时间范围
+          dateRange
+            ? {
+                createdAt: {
+                  gte: dateRange.from,
+                  lte: dateRange.to,
+                },
+              }
+            : {},
+        ],
+      };
+
+      const [users, total] = await Promise.all([
+        ctx.db.user.findMany({
+          where,
+          orderBy: sortBy
+            ? {
+                [sortBy]: sortOrder ?? ("desc" as const),
+              }
+            : {
+                createdAt: "desc" as const,
+              },
+          skip,
+          take: pageSize,
+          select: {
+            id: true,
+            email: true,
+            name: true,
+            role: true,
+            balance: true,
+            createdAt: true,
+            updatedAt: true,
+          },
+        }),
+        ctx.db.user.count({ where }),
+      ]);
+
+      return {
+        items: users,
+        metadata: {
+          total,
+          page,
+          pageSize,
+          pageCount: Math.ceil(total / pageSize),
+        },
+      };
     }),
 });
