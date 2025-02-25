@@ -160,8 +160,7 @@ export default function AppSidebar() {
                       {renderUsername()}
                     </span>
                     <span className="truncate text-xs text-muted-foreground">
-                      {user?.role === "ADMIN" ? "管理员" : "普通用户"} · ¥
-                      {user?.balance ?? 0}
+                      {user?.role === "ADMIN" ? "管理员" : "普通用户"}
                     </span>
                   </div>
                   <ChevronsUpDown className="ml-auto size-4" />
@@ -187,15 +186,7 @@ export default function AppSidebar() {
                   </div>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem>
-                  <UserIcon className="mr-2 size-4" />
-                  个人信息
-                </DropdownMenuItem>
-                <DropdownMenuItem>
-                  <CreditCard className="mr-2 size-4" />
-                  余额: ¥{user?.balance ?? 0}
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
+
                 <DropdownMenuItem onClick={() => router.push("/")}>
                   <LogOut className="mr-2 size-4" />
                   返回首页
