@@ -386,15 +386,23 @@ export const usersRouter = createTRPCRouter({
       z.object({
         page: z.number().min(1).default(1),
         pageSize: z.number().min(1).max(100).default(10),
-        search: z.string().optional(),
+        name: z.string().optional(),
         email: z.string().optional(),
         role: z.enum(["ADMIN", "USER"]).optional(),
+        // 支持单独的余额最小值和最大值
+        balanceMin: z.string().optional(),
+        balanceMax: z.string().optional(),
+        // 支持余额范围对象
         balanceRange: z
           .object({
             min: z.number().optional(),
             max: z.number().optional(),
           })
           .optional(),
+        // 支持单独的日期开始和结束
+        createdAtStart: z.string().optional(),
+        createdAtEnd: z.string().optional(),
+        // 支持日期范围对象
         dateRange: z
           .object({
             from: z.date().optional(),
@@ -409,24 +417,52 @@ export const usersRouter = createTRPCRouter({
       const {
         page,
         pageSize,
-        search,
+        name,
         email,
         role,
+        balanceMin,
+        balanceMax,
         balanceRange,
+        createdAtStart,
+        createdAtEnd,
         dateRange,
         sortBy,
         sortOrder,
       } = input;
       const skip = (page - 1) * pageSize;
 
+      // 处理余额范围
+      let finalBalanceMin: number | undefined = undefined;
+      let finalBalanceMax: number | undefined = undefined;
+
+      if (balanceRange) {
+        finalBalanceMin = balanceRange.min;
+        finalBalanceMax = balanceRange.max;
+      } else {
+        if (balanceMin) finalBalanceMin = parseFloat(balanceMin);
+        if (balanceMax) finalBalanceMax = parseFloat(balanceMax);
+      }
+
+      // 处理日期范围
+      let finalDateFrom: Date | undefined = undefined;
+      let finalDateTo: Date | undefined = undefined;
+
+      if (dateRange) {
+        finalDateFrom = dateRange.from;
+        finalDateTo = dateRange.to;
+      } else {
+        if (createdAtStart) finalDateFrom = new Date(createdAtStart);
+        if (createdAtEnd) finalDateTo = new Date(createdAtEnd);
+      }
+
       const where = {
         AND: [
           // 搜索条件
-          search
+          name
             ? {
                 OR: [
-                  { name: { contains: search, mode: "insensitive" as const } },
-                  { email: { contains: search, mode: "insensitive" as const } },
+                  { name: { contains: name, mode: "insensitive" as const } },
+                  { email: { contains: name, mode: "insensitive" as const } },
                 ],
               }
             : {},
@@ -435,24 +471,24 @@ export const usersRouter = createTRPCRouter({
           // 角色筛选
           role ? { role } : {},
           // 余额范围
-          balanceRange
+          finalBalanceMin || finalBalanceMax
             ? {
                 balance: {
-                  gte: balanceRange.min
-                    ? new Decimal(balanceRange.min)
+                  gte: finalBalanceMin
+                    ? new Decimal(finalBalanceMin)
                     : undefined,
-                  lte: balanceRange.max
-                    ? new Decimal(balanceRange.max)
+                  lte: finalBalanceMax
+                    ? new Decimal(finalBalanceMax)
                     : undefined,
                 },
               }
             : {},
           // 创建时间范围
-          dateRange
+          finalDateFrom || finalDateTo
             ? {
                 createdAt: {
-                  gte: dateRange.from,
-                  lte: dateRange.to,
+                  gte: finalDateFrom,
+                  lte: finalDateTo,
                 },
               }
             : {},
@@ -493,5 +529,59 @@ export const usersRouter = createTRPCRouter({
           pageCount: Math.ceil(total / pageSize),
         },
       };
+    }),
+  updateUserBalance: protectedProcedure
+    .input(
+      z.object({
+        id: z.string(),
+        balance: z.number().min(0),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const { id, balance } = input;
+
+      try {
+        // 查找用户，确保用户存在
+        const user = await ctx.db.user.findUnique({
+          where: { id },
+          select: { id: true },
+        });
+
+        if (!user) {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "用户不存在",
+          });
+        }
+
+        // 更新用户余额
+        const updatedUser = await ctx.db.user.update({
+          where: { id },
+          data: { balance: new Decimal(balance) },
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            balance: true,
+          },
+        });
+
+        return {
+          success: true,
+          user: updatedUser,
+          message: "余额更新成功",
+        };
+      } catch (error) {
+        console.error("Update user balance error:", error);
+
+        if (error instanceof TRPCError) {
+          throw error;
+        }
+
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "更新余额失败",
+        });
+      }
     }),
 });

@@ -18,8 +18,10 @@ import {
 import {
   ChevronRight,
   ChevronsUpDown,
-  GalleryVerticalEnd,
   LogOut,
+  BookOpen,
+  User as UserIcon,
+  CreditCard,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -29,56 +31,49 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "~/components/ui/dropdown-menu";
-import { api } from "~/trpc/react";
 import * as React from "react";
-import { useState } from "react";
 import { Skeleton } from "~/components/ui/skeleton";
-import Image from "next/image";
-import { signOut } from "next-auth/react";
 import { Collapsible, CollapsibleContent } from "../ui/collapsible";
 import { CollapsibleTrigger } from "../ui/collapsible";
 import { navItems } from "~/constants/data";
 import { usePathname } from "next/navigation";
 import { Icons } from "../common/Icons";
 import Link from "next/link";
+import { useSession } from "next-auth/react";
+import { useRouter } from "next/navigation";
 
 export const company = {
-  name: "TokenBases",
-  logo: GalleryVerticalEnd,
-  plan: "Merchant System",
+  name: "智慧书城管理系统",
+  logo: BookOpen,
+  plan: "智慧阅读 · 知识无限",
   logoUrl: "/images/logo.svg",
 };
 
 export default function AppSidebar() {
-  const [loading, setLoading] = useState(true);
   const pathname = usePathname();
+  const { data: session } = useSession();
+  const user = session?.user;
+  const router = useRouter();
 
-  const { data: user } = api.users.fetchUserInfo.useQuery();
   const renderUserAvatar = () =>
-    loading ? (
-      <Skeleton className="h-8 w-8 rounded-lg" />
-    ) : (
+    user ? (
       <Avatar className="h-8 w-8 rounded-lg">
-        <AvatarImage />
+        <AvatarImage src={user.image} />
         <AvatarFallback className="rounded-lg">
           {user?.name ? user.name[0] : "N"}
         </AvatarFallback>
       </Avatar>
+    ) : (
+      <Skeleton className="h-8 w-8 rounded-lg" />
     );
 
-  const renderUsername = () =>
-    loading ? <Skeleton className="h-4 w-20" /> : user?.name;
+  const renderUsername = () => user?.name;
 
   return (
     <Sidebar collapsible="icon">
       <SidebarHeader>
-        <div className="text-sidebar-accent-foreground flex gap-2 py-2">
-          <Image
-            src={company.logoUrl}
-            alt={company.name}
-            width={32}
-            height={32}
-          />
+        <div className="flex gap-2 py-2 text-sidebar-accent-foreground">
+          <BookOpen className="h-8 w-8 text-primary" />
           <div className="grid flex-1 text-left text-sm leading-tight">
             <span className="truncate font-semibold">{company.name}</span>
             <span className="truncate text-xs">{company.plan}</span>
@@ -165,11 +160,8 @@ export default function AppSidebar() {
                       {renderUsername()}
                     </span>
                     <span className="truncate text-xs text-muted-foreground">
-                      {loading ? (
-                        <Skeleton className="h-3 w-12" />
-                      ) : (
-                        `${user?.email}`
-                      )}
+                      {user?.role === "ADMIN" ? "管理员" : "普通用户"} · ¥
+                      {user?.balance ?? 0}
                     </span>
                   </div>
                   <ChevronsUpDown className="ml-auto size-4" />
@@ -189,19 +181,24 @@ export default function AppSidebar() {
                         {renderUsername()}
                       </span>
                       <span className="truncate text-xs text-muted-foreground">
-                        {loading ? (
-                          <Skeleton className="h-3 w-12" />
-                        ) : (
-                          `${user?.email}`
-                        )}
+                        {user?.email}
                       </span>
                     </div>
                   </div>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => signOut()}>
-                  <LogOut className="mr-2 size-5" />
-                  退出
+                <DropdownMenuItem>
+                  <UserIcon className="mr-2 size-4" />
+                  个人信息
+                </DropdownMenuItem>
+                <DropdownMenuItem>
+                  <CreditCard className="mr-2 size-4" />
+                  余额: ¥{user?.balance ?? 0}
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => router.push("/")}>
+                  <LogOut className="mr-2 size-4" />
+                  返回首页
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>

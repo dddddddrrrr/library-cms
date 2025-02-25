@@ -131,7 +131,7 @@ export function DataTablePagination<TData>({
               className={cn(
                 "h-8 w-8 p-0",
                 currentPage === pageNum
-                  ? "border border-primary bg-transparent text-primary hover:bg-primary/10"
+                  ? "border border-muted-foreground bg-transparent text-muted-foreground hover:bg-muted-foreground/5"
                   : "border-none hover:bg-muted-foreground/5",
               )}
               onClick={() => onPageChange?.(pageNum)}

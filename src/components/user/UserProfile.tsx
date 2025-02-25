@@ -6,7 +6,7 @@ import {
   DropdownMenuContent,
   DropdownMenuTrigger,
 } from "~/components/ui/dropdown-menu";
-import { User, Bell, LogOut, Book } from "lucide-react";
+import { User, Bell, LogOut, Book, Settings } from "lucide-react";
 import UserAvatar from "~/components/user/UserAvatar";
 import { signOut } from "next-auth/react";
 
@@ -65,6 +65,17 @@ const UserProfile = () => {
           >
             <LogOut className="mr-2 h-5 w-4" /> 退出登录
           </div>
+          {session?.user.role === "ADMIN" && (
+            <div
+              onClick={() => {
+                router.push(`/cms/user`);
+              }}
+              className="flex cursor-pointer rounded-lg px-2 py-2 text-sm hover:bg-gray-100 dark:hover:bg-[#2D2D2D]"
+            >
+              <Settings className="mr-2 h-5 w-4" />
+              后台管理
+            </div>
+          )}
         </DropdownMenuContent>
       </DropdownMenu>
     </>

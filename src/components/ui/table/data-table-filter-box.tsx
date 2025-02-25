@@ -1,4 +1,3 @@
-/* eslint-disable */
 "use client";
 
 import { useState } from "react";
@@ -36,7 +35,6 @@ export interface Filter {
   precision?: number;
 }
 
-// 添加一个类型来描述过滤器的值
 export type FilterValue =
   | string
   | Date
@@ -49,6 +47,7 @@ interface DataTableFilterBoxProps<TData> {
   onSearch: (values: Record<string, FilterValue>) => void;
   defaultValues?: Record<string, FilterValue>;
   filterLoading?: Record<string, boolean>;
+  onFilterChange?: (column: string, value: FilterValue) => void;
 }
 
 export function DataTableFilterBox<TData>({
@@ -57,6 +56,7 @@ export function DataTableFilterBox<TData>({
   onSearch,
   defaultValues = {},
   filterLoading,
+  onFilterChange,
 }: DataTableFilterBoxProps<TData>) {
   const [date, setDate] = useState<DateRange>({
     from: undefined,
@@ -64,9 +64,7 @@ export function DataTableFilterBox<TData>({
   });
 
   const [filterValues, setFilterValues] = useState<Record<string, FilterValue>>(
-    () => {
-      return { ...defaultValues };
-    },
+    () => ({ ...defaultValues }),
   );
   const [isSearching, setIsSearching] = useState(false);
 
@@ -81,16 +79,11 @@ export function DataTableFilterBox<TData>({
         [column]: value,
       }));
     }
-  };
 
-  // 添加一个类型守卫函数
-  const isDateArray = (value: unknown): value is [Date, Date] => {
-    return (
-      Array.isArray(value) &&
-      value.length === 2 &&
-      value[0] instanceof Date &&
-      value[1] instanceof Date
-    );
+    // 如果有 onFilterChange 回调，调用它
+    if (onFilterChange) {
+      onFilterChange(column, value);
+    }
   };
 
   const renderFilter = (filter: Filter) => {
@@ -168,7 +161,7 @@ export function DataTableFilterBox<TData>({
             <Input
               type="number"
               placeholder={`最小${filter.label}`}
-              value={filterValues[`${filter.column}Min`] as string}
+              value={(filterValues[`${filter.column}Min`] as string) || ""}
               onChange={(event) => {
                 setFilterValues((prev) => ({
                   ...prev,
@@ -181,7 +174,7 @@ export function DataTableFilterBox<TData>({
             <Input
               type="number"
               placeholder={`最大${filter.label}`}
-              value={filterValues[`${filter.column}Max`] as string}
+              value={(filterValues[`${filter.column}Max`] as string) || ""}
               onChange={(event) => {
                 setFilterValues((prev) => ({
                   ...prev,
@@ -206,46 +199,25 @@ export function DataTableFilterBox<TData>({
                 )}
               >
                 <CalendarIcon className="mr-2 h-4 w-4" />
-                {isDateArray(dateValue)
-                  ? `${format(dateValue[0], "MM-dd")} 至 ${format(
-                      dateValue[1],
-                      "MM-dd",
-                    )}`
-                  : `${filter.label}`}
+                {dateValue instanceof Date
+                  ? format(dateValue, "MM-dd")
+                  : filter.label}
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-auto p-0" align="start">
               <div className="flex space-x-2 p-2">
                 <Calendar
                   mode="single"
-                  selected={isDateArray(dateValue) ? dateValue[0] : undefined}
+                  selected={dateValue instanceof Date ? dateValue : undefined}
                   onSelect={(date) => {
                     if (date) {
-                      const currentValue = isDateArray(dateValue)
-                        ? dateValue
-                        : [undefined, undefined];
                       setFilterValues((prev) => ({
                         ...prev,
-                        [filter.column]: [date, currentValue[1]],
+                        [filter.column]: date,
                       }));
                     }
                   }}
                   initialFocus
-                />
-                <Calendar
-                  mode="single"
-                  selected={isDateArray(dateValue) ? dateValue[1] : undefined}
-                  onSelect={(date) => {
-                    if (date) {
-                      const currentValue = isDateArray(dateValue)
-                        ? dateValue
-                        : [undefined, undefined];
-                      setFilterValues((prev) => ({
-                        ...prev,
-                        [filter.column]: [currentValue[0], date],
-                      }));
-                    }
-                  }}
                 />
               </div>
             </PopoverContent>
@@ -311,50 +283,31 @@ export function DataTableFilterBox<TData>({
 
   const handleSearch = async () => {
     if (isSearching) return;
-
+    setIsSearching(true);
     try {
-      setIsSearching(true);
-      const searchValues = Object.entries(filterValues).reduce(
-        (acc, [key, value]) => {
-          if (value !== "") {
-            acc[key] = value;
-          }
-          return acc;
-        },
-        {} as Record<string, FilterValue>,
-      );
-
-      await onSearch(searchValues);
+      // 创建一个新的对象传递给 onSearch，避免引用问题
+      const searchValues = { ...filterValues };
+      onSearch(searchValues);
     } finally {
       setIsSearching(false);
     }
   };
 
   const handleReset = () => {
-    const newFilterValues: Record<string, FilterValue> = {};
+    // 重置状态
+    setFilterValues({});
+    setDate({ from: undefined, to: undefined });
 
-    filters.forEach((filter) => {
-      if (filter.type === "select") {
-        newFilterValues[filter.column] = "";
-      } else if (filter.type === "date-range") {
-        newFilterValues[filter.column] = null;
-        setDate({ from: undefined, to: undefined });
-      } else if (filter.type === "number-range") {
-        newFilterValues[`${filter.column}Min`] = "";
-        newFilterValues[`${filter.column}Max`] = "";
-      } else {
-        newFilterValues[filter.column] = "";
-      }
-    });
-
-    setFilterValues(newFilterValues);
-    onSearch?.({});
+    // 确保触发查询
+    setTimeout(() => {
+      onSearch({});
+    }, 0);
   };
 
   return (
-    <div className="space-y-2 rounded-md">
+    <div className="space-y-2 rounded-md border border-input p-4 shadow-sm">
       <div className="relative">
-        <div className="grid grid-cols-1 gap-2 pr-24 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+        <div className="grid grid-cols-1 gap-2 pr-24 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-4">
           {filters?.map((filter) => (
             <div key={filter.column}>{renderFilter(filter)}</div>
           ))}

@@ -9,6 +9,7 @@ const Dashboard = () => {
     if (session && session.user.role === "USER") {
       router.push("/");
     }
+    router.push("/cms/user");
   }, [router, session]);
 
   return <div>Dashboard</div>;

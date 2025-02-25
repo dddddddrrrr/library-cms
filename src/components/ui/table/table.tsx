@@ -1,4 +1,3 @@
-/* eslint-disable */
 "use client";
 
 import { ScrollArea, ScrollBar } from "~/components/ui/scroll-area";
@@ -18,14 +17,13 @@ import {
   getPaginationRowModel,
   type PaginationState,
   useReactTable,
-  getSortedRowModel,
-  getFilteredRowModel,
 } from "@tanstack/react-table";
 import { useState } from "react";
 import { DataTableFilterBox } from "./data-table-filter-box";
 import { DataTablePagination } from "./data-table-pagination";
 import Image from "next/image";
 import type { FilterValue } from "./data-table-filter-box";
+import React from "react";
 
 export interface FilterOption {
   label: string;
@@ -53,59 +51,62 @@ export interface TableState {
 }
 
 export interface DataTableProps<TData, TValue> {
-  // 基础数据
   columns: ColumnDef<TData, TValue>[];
   data: TData[];
   totalItems?: number;
-
-  // 功能开关
-  enablePagination?: boolean;
-  enableSorting?: boolean;
-  enableFilters?: boolean;
-
-  // 配置
   pageSizeOptions?: number[];
   filters?: Filter[];
+  onSearch?: (values: Record<string, FilterValue>) => void;
   defaultValues?: Record<string, FilterValue>;
-
-  // 状态回调
-  onStateChange?: (state: TableState) => void;
-
-  // 加载状态
+  filterLoading?: Record<string, boolean>;
+  onFilterChange?: (column: string, value: FilterValue) => void;
+  pagination?: {
+    pageCount: number;
+    page: number;
+    pageSize: number;
+    total: number;
+    onPageChange: (page: number) => void;
+  };
   loading?: boolean;
-
-  // 自定义渲染
-  emptyContent?: React.ReactNode;
-  loadingContent?: React.ReactNode;
 }
 
 export function DataTable<TData, TValue>({
   columns,
   data,
   totalItems,
-  enablePagination = true,
-  enableSorting = true,
-  enableFilters = true,
   pageSizeOptions = [10, 20, 30, 40, 50],
   filters,
+  onSearch,
   defaultValues,
-  onStateChange,
-  loading = false,
-  emptyContent,
-  loadingContent,
+  filterLoading,
+  onFilterChange,
+  pagination,
+  loading,
 }: DataTableProps<TData, TValue>) {
-  // 使用普通的 state 替代 useQueryState
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
 
   const paginationState = {
-    pageIndex: currentPage - 1,
+    pageIndex: currentPage - 1, // zero-based index for React Table
     pageSize: pageSize,
   };
 
   const pageCount = Math.ceil((totalItems ?? 0) / pageSize);
 
-  // 表格实例
+  const handlePaginationChange = (
+    updaterOrValue:
+      | PaginationState
+      | ((old: PaginationState) => PaginationState),
+  ) => {
+    const pagination =
+      typeof updaterOrValue === "function"
+        ? updaterOrValue(paginationState)
+        : updaterOrValue;
+
+    setCurrentPage(pagination.pageIndex + 1); // converting zero-based index to one-based
+    setPageSize(pagination.pageSize);
+  };
+
   const table = useReactTable({
     data,
     columns,
@@ -113,138 +114,140 @@ export function DataTable<TData, TValue>({
     state: {
       pagination: paginationState,
     },
-    onPaginationChange: (updater) => {
-      if (typeof updater === "function") {
-        const newPagination = updater(paginationState);
-        setCurrentPage(newPagination.pageIndex + 1);
-        setPageSize(newPagination.pageSize);
-      } else {
-        setCurrentPage(updater.pageIndex + 1);
-        setPageSize(updater.pageSize);
-      }
-    },
+    onPaginationChange: handlePaginationChange,
     getCoreRowModel: getCoreRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
-    getSortedRowModel: getSortedRowModel(),
-    getFilteredRowModel: getFilteredRowModel(),
-    enableSorting,
-    enableFilters,
     manualPagination: true,
+    manualFiltering: true,
   });
-
-  // 渲染加载状态
-  if (loading) {
-    return (
-      loadingContent || (
-        <div className="space-y-3">
-          <Skeleton className="h-8 w-full" />
-          <Skeleton className="h-8 w-full" />
-          <Skeleton className="h-8 w-full" />
-        </div>
-      )
-    );
-  }
 
   return (
     <div className="space-y-4">
-      {enableFilters && filters && (
+      {filters && (
         <DataTableFilterBox
+          key="filter-box"
           table={table}
           filters={filters}
+          onSearch={
+            onSearch ??
+            (() => {
+              // Implement default search behavior if needed
+              console.log("默认搜索行为");
+            })
+          }
           defaultValues={defaultValues}
-          onSearch={(values) => {
-            onStateChange?.({
-              pagination: paginationState,
-              sorting: { column: "", direction: null },
-              filters: values,
-            });
-          }}
+          filterLoading={filterLoading}
+          onFilterChange={onFilterChange}
         />
       )}
 
-      <ScrollArea className="rounded-md border">
-        <Table>
-          <TableHeader>
-            {table.getHeaderGroups().map((headerGroup) => (
-              <TableRow key={headerGroup.id}>
-                {headerGroup.headers.map((header) => (
-                  <TableHead key={header.id}>
-                    {header.isPlaceholder
-                      ? null
-                      : flexRender(
-                          header.column.columnDef.header,
-                          header.getContext(),
-                        )}
-                  </TableHead>
-                ))}
-              </TableRow>
-            ))}
-          </TableHeader>
-          <TableBody>
-            {table.getRowModel().rows?.length ? (
-              table.getRowModel().rows.map((row) => (
-                <TableRow
-                  key={row.id}
-                  data-state={row.getIsSelected() && "selected"}
-                >
-                  {row.getVisibleCells().map((cell) => {
-                    const value = cell.getValue();
-                    return (
-                      <TableCell key={cell.id}>
-                        {flexRender(
-                          cell.column.columnDef.cell,
-                          cell.getContext(),
-                        )}
-                      </TableCell>
-                    );
-                  })}
+      <ScrollArea className="grid h-[calc(80vh-220px)] rounded-md border bg-white dark:bg-[hsl(var(--card))] md:h-[calc(90dvh-240px)]">
+        <div className="min-w-max">
+          <Table>
+            <TableHeader>
+              {table.getHeaderGroups().map((headerGroup) => (
+                <TableRow key={headerGroup.id}>
+                  {headerGroup.headers.map((header) => (
+                    <TableHead key={header.id}>
+                      {header.isPlaceholder
+                        ? null
+                        : flexRender(
+                            header.column.columnDef.header,
+                            header.getContext(),
+                          )}
+                    </TableHead>
+                  ))}
                 </TableRow>
-              ))
-            ) : (
-              <TableRow>
-                <TableCell
-                  colSpan={columns.length}
-                  className="h-24 text-center"
-                >
-                  {emptyContent || (
+              ))}
+            </TableHeader>
+            <TableBody>
+              {loading ? (
+                // 加载状态
+                <>
+                  {Array.from({ length: 5 }).map((_, index) => (
+                    <TableRow key={index}>
+                      {columns.map((_, cellIndex) => (
+                        <TableCell key={cellIndex}>
+                          <Skeleton className="h-6 w-full" />
+                        </TableCell>
+                      ))}
+                    </TableRow>
+                  ))}
+                </>
+              ) : data.length === 0 ? (
+                // 空数据状态
+                <TableRow>
+                  <TableCell colSpan={columns.length} className="h-[350px]">
                     <div className="flex h-full w-full flex-col items-center justify-center">
                       <div className="relative">
                         <Image
-                          src="/images/no-data.svg"
-                          alt="no-data"
+                          src={"/no-data.svg"}
+                          alt={"no-data"}
                           width={250}
                           height={250}
                           loading="lazy"
+                          className="object-cover"
                         />
                         <span className="absolute bottom-3 left-1/2 -translate-x-1/2 text-muted-foreground">
                           暂无数据
                         </span>
                       </div>
                     </div>
-                  )}
-                </TableCell>
-              </TableRow>
-            )}
-          </TableBody>
-        </Table>
+                  </TableCell>
+                </TableRow>
+              ) : (
+                // 数据展示
+                table.getRowModel().rows.map((row) => (
+                  <TableRow
+                    key={row.id}
+                    data-state={row.getIsSelected() && "selected"}
+                  >
+                    {row.getVisibleCells().map((cell) => {
+                      const value = cell.getValue();
+                      const content = flexRender(
+                        cell.column.columnDef.cell,
+                        cell.getContext(),
+                      );
+
+                      return (
+                        <TableCell key={cell.id}>
+                          {cell.column.id === "actions"
+                            ? content
+                            : value === "" ||
+                                value === null ||
+                                value === undefined
+                              ? "-"
+                              : content}
+                        </TableCell>
+                      );
+                    })}
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </div>
         <ScrollBar orientation="horizontal" />
       </ScrollArea>
 
-      {enablePagination && (
-        <DataTablePagination
-          table={table}
-          pageSizeOptions={pageSizeOptions}
-          onPageChange={(page) => {
+      <DataTablePagination
+        table={table}
+        pageCount={
+          pagination?.pageCount ??
+          Math.ceil((totalItems ?? 0) / (pageSize ?? 10))
+        }
+        currentPage={pagination?.page ?? currentPage}
+        pageSize={pagination?.pageSize ?? pageSize}
+        total={pagination?.total ?? totalItems ?? 0}
+        onPageChange={(page) => {
+          if (pagination?.onPageChange) {
+            pagination.onPageChange(page);
+          } else {
             setCurrentPage(page);
-          }}
-          {...{
-            pageCount,
-            page: currentPage,
-            pageSize,
-            total: totalItems ?? 0,
-          }}
-        />
-      )}
+          }
+        }}
+        loading={loading}
+      />
     </div>
   );
 }

@@ -10,38 +10,34 @@ interface NavItem {
 
 export const navItems: NavItem[] = [
   {
-    title: "仪表盘",
-    url: "/dashboard",
-    icon: "dashboard",
-  },
-  {
     title: "用户管理",
-    url: "/dashboard/user",
-    icon: "user",
+    url: "/cms/user",
+    icon: "user2",
   },
   {
-    title: "商品管理",
-    url: "/product",
-    icon: "product",
-    items: [
-      {
-        title: "商品列表",
-        url: "/product/list",
-      },
-      {
-        title: "添加商品",
-        url: "/product/add",
-      },
-    ],
+    title: "书本管理",
+    url: "/cms/book",
+    icon: "media",
   },
   {
     title: "订单管理",
-    url: "/order",
+    url: "/cms/orders",
     icon: "billing",
   },
   {
-    title: "系统设置",
-    url: "/settings",
+    title: "充值管理",
+    url: "/cms/recharges",
     icon: "settings",
   },
+  {
+    title: "浏览记录",
+    url: "/cms/views",
+    icon: "laptop",
+  },
+  {
+    title: "评论管理",
+    url: "/cms/comments",
+    icon: "laptop",
+  },
+  
 ];

@@ -1,8 +1,318 @@
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure, publicProcedure } from "../trpc";
 import { TRPCError } from "@trpc/server";
+import { type Prisma, type BookStatus } from "@prisma/client";
 
 export const booksRouter = createTRPCRouter({
+  // 创建新书籍
+  createBook: protectedProcedure
+    .input(
+      z.object({
+        title: z.string().min(1, "书名不能为空"),
+        author: z.string().min(1, "作者不能为空"),
+        isbn: z.string().optional(),
+        description: z.string().optional(),
+        cover: z.string().optional(),
+        price: z.number().min(0, "价格不能为负数"),
+        stock: z.number().int().min(0, "库存不能为负数"),
+        status: z
+          .enum(["AVAILABLE", "OUT_OF_STOCK", "DISCONTINUED"])
+          .default("AVAILABLE"),
+        publisher: z.string().optional(),
+        publishDate: z.date().optional(),
+        categoryId: z.string().min(1, "必须选择分类"),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      // 检查用户权限
+      if (ctx.session.user.role !== "ADMIN") {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "只有管理员可以添加书籍",
+        });
+      }
+
+      try {
+        const book = await ctx.db.book.create({
+          data: {
+            title: input.title,
+            author: input.author,
+            isbn: input.isbn ?? "",
+            description: input.description ?? null,
+            cover: input.cover ?? null,
+            price: input.price,
+            stock: input.stock,
+            status: input.status,
+            publisher: input.publisher ?? null,
+            publishDate: input.publishDate ?? null,
+            categoryId: input.categoryId,
+          },
+          include: {
+            category: true,
+          },
+        });
+
+        return book;
+      } catch (error) {
+        console.error("Create book error:", error);
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "创建书籍失败",
+        });
+      }
+    }),
+
+  // 获取所有分类
+  fetchCategories: publicProcedure.query(async ({ ctx }) => {
+    try {
+      const categories = await ctx.db.category.findMany({
+        orderBy: {
+          name: "asc",
+        },
+      });
+      return categories;
+    } catch (error) {
+      console.error("Fetch categories error:", error);
+      throw new TRPCError({
+        code: "INTERNAL_SERVER_ERROR",
+        message: "获取分类列表失败",
+      });
+    }
+  }),
+
+  // 高级查询方法，支持分页、标题搜索、价格范围和作者条件查询
+  fetchAllBooks: publicProcedure
+    .input(
+      z.object({
+        page: z.number().min(1).default(1),
+        pageSize: z.number().min(1).max(100).default(10),
+        title: z.string().optional(),
+        author: z.string().optional(),
+        priceMin: z.number().optional(),
+        priceMax: z.number().optional(),
+        categoryId: z.string().optional(),
+        status: z.string().optional(),
+        sortBy: z
+          .enum(["title", "price", "author", "createdAt"])
+          .optional()
+          .default("createdAt"),
+        sortOrder: z.enum(["asc", "desc"]).optional().default("desc"),
+      }),
+    )
+    .query(async ({ ctx, input }) => {
+      try {
+        const {
+          page,
+          pageSize,
+          title,
+          author,
+          priceMin,
+          priceMax,
+          categoryId,
+          status,
+          sortBy,
+          sortOrder,
+        } = input;
+
+        // 构建查询条件
+        const where: Prisma.BookWhereInput = {};
+
+        // 标题模糊搜索
+        if (title) {
+          where.title = {
+            contains: title,
+          };
+        }
+
+        // 作者模糊搜索
+        if (author) {
+          where.author = {
+            contains: author,
+          };
+        }
+
+        // 价格范围查询
+        if (priceMin !== undefined || priceMax !== undefined) {
+          where.price = {};
+
+          if (priceMin !== undefined) {
+            where.price = {
+              ...where.price,
+              gte: priceMin,
+            };
+          }
+
+          if (priceMax !== undefined) {
+            where.price = {
+              ...where.price,
+              lte: priceMax,
+            };
+          }
+        }
+
+        // 分类查询
+        if (categoryId) {
+          where.categoryId = categoryId;
+        }
+
+        // 状态查询
+        if (status) {
+          where.status = status as BookStatus;
+        }
+
+        // 计算总数
+        const total = await ctx.db.book.count({ where });
+
+        // 计算总页数
+        const pageCount = Math.ceil(total / pageSize);
+
+        const orderBy: Prisma.BookOrderByWithRelationInput = {
+          [sortBy]: sortOrder,
+        };
+
+        // 查询数据
+        const items = await ctx.db.book.findMany({
+          where,
+          include: {
+            category: true,
+          },
+          orderBy,
+          skip: (page - 1) * pageSize,
+          take: pageSize,
+        });
+
+        return {
+          items,
+          metadata: {
+            total,
+            page,
+            pageSize,
+            pageCount,
+          },
+        };
+      } catch (error) {
+        console.error("Fetch books error:", error);
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "获取图书列表失败",
+        });
+      }
+    }),
+
+  // 更新书籍
+  updateBook: protectedProcedure
+    .input(
+      z.object({
+        id: z.string(),
+        title: z.string().min(1, "书名不能为空"),
+        author: z.string().min(1, "作者不能为空"),
+        isbn: z.string().optional(),
+        description: z.string().optional(),
+        cover: z.string().optional(),
+        price: z.number().min(0, "价格不能为负数"),
+        stock: z.number().int().min(0, "库存不能为负数"),
+        status: z.enum(["AVAILABLE", "OUT_OF_STOCK", "DISCONTINUED"]),
+        categoryId: z.string().min(1, "必须选择分类"),
+        publisher: z.string().optional(),
+        publishDate: z.date().optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const { id, ...data } = input;
+
+      // 检查用户权限
+      if (ctx.session.user.role !== "ADMIN") {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "只有管理员可以更新书籍",
+        });
+      }
+
+      try {
+        // 检查书籍是否存在
+        const existingBook = await ctx.db.book.findUnique({
+          where: { id },
+        });
+
+        if (!existingBook) {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "书籍不存在",
+          });
+        }
+
+        const updatedBook = await ctx.db.book.update({
+          where: { id },
+          data: {
+            title: data.title,
+            author: data.author,
+            isbn: data.isbn ?? "",
+            description: data.description ?? null,
+            cover: data.cover ?? null,
+            price: data.price,
+            stock: data.stock,
+            status: data.status,
+            categoryId: data.categoryId,
+            publisher: data.publisher ?? null,
+            publishDate: data.publishDate ?? null,
+          },
+          include: {
+            category: true,
+          },
+        });
+
+        return updatedBook;
+      } catch (error) {
+        console.error("Update book error:", error);
+        if (error instanceof TRPCError) throw error;
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "更新书籍失败",
+        });
+      }
+    }),
+
+  // 删除书籍
+  deleteBook: protectedProcedure
+    .input(z.object({ id: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      // 检查用户权限
+      if (ctx.session.user.role !== "ADMIN") {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "只有管理员可以删除书籍",
+        });
+      }
+
+      try {
+        // 检查书籍是否存在
+        const existingBook = await ctx.db.book.findUnique({
+          where: { id: input.id },
+        });
+
+        if (!existingBook) {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "书籍不存在",
+          });
+        }
+
+        // 删除书籍
+        await ctx.db.book.delete({
+          where: { id: input.id },
+        });
+
+        return { success: true };
+      } catch (error) {
+        console.error("Delete book error:", error);
+        if (error instanceof TRPCError) throw error;
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "删除书籍失败",
+        });
+      }
+    }),
+
   fetchBooks: publicProcedure.query(async ({ ctx }) => {
     try {
       const books = await ctx.db.book.findMany({
@@ -590,6 +900,7 @@ export const booksRouter = createTRPCRouter({
           },
         });
         return chapters;
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
       } catch (error) {
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
@@ -615,6 +926,7 @@ export const booksRouter = createTRPCRouter({
           },
         });
         return chapter;
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
       } catch (error) {
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
@@ -651,6 +963,7 @@ export const booksRouter = createTRPCRouter({
           },
         });
         return { success: true };
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
       } catch (error) {
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
@@ -674,6 +987,7 @@ export const booksRouter = createTRPCRouter({
           },
         });
         return !!order;
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
       } catch (error) {
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
